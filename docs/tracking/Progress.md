@@ -24,18 +24,20 @@ Tracking active implementation milestones, verification status, and deliverable 
 ## Milestone 2: Backend Architecture & Storage
 - [x] User authentication (passwordless, email + name; JWT in an `httpOnly` cookie) — login / me / logout
 - [x] Local JSON file storage engine with per-file mutex locks and atomic write-rename
-- [ ] Media & file streaming storage for raw text, portraits, and illustrations
-- [ ] Server-side validation for step transitions and project ownership
+- [x] Projects API (create, list, get, step state validation, ownership isolation)
+- [x] Media & file streaming storage for portraits and chapter illustrations
 
 ## Milestone 3: Gemini Pipeline & Concurrency Safety
-- [ ] Gemini API integration (REST client, structured JSON schemas)
-- [ ] Art style generation & custom style override (Step 1)
-- [ ] Character extraction capped strictly to **max 2 adult characters** (Step 2)
-- [ ] Character portrait generation & local caching (Step 3)
-- [ ] Chapter extraction capped strictly to **max 1 chapter** (Step 4)
-- [ ] Chapter illustration generation referencing portraits (Step 5)
-- [ ] Server-side concurrency guard (blocking duplicate runs with 409)
-- [ ] Stranded / stuck step timeout and recovery mechanism
+- [x] Gemini REST client (`/interactions` endpoint with context chaining)
+- [x] Step 00 book ingestion (single text transmission anchor)
+- [x] Step 01 art style generation & custom style override
+- [x] Step 02 character extraction (strictly capped to **max 2 adults**)
+- [x] Step 03 character portrait generation via conversational image model (`gemini-3.1-flash-image`)
+- [x] Step 04 chapter extraction (strictly capped to **max 1 chapter**)
+- [x] Step 05 chapter illustration generation with multi-image conditioning
+- [x] Server-side concurrency guard (blocking duplicate runs with 409)
+- [x] Stranded / stuck step timeout and stale recovery (`getStepStaleMs()`)
+- [x] Zero auto-retry rule (all failures require user-triggered retry)
 
 ## Milestone 4: Frontend UI / UX (Amrit Palace Design System)
 - [x] Tailwind CSS configuration with Amrit Palace design tokens
@@ -48,9 +50,9 @@ Tracking active implementation milestones, verification status, and deliverable 
 - [x] In-progress step indicator, state machines, and retry affordances
 
 ## Milestone 5: Testing & Deliverables
-- [x] Backend tests for identity and the concurrency-safe JSON store (18 passing)
-- [ ] Backend tests for step ordering, state machine, caps, and retry safety
-- [ ] Frontend tests for component loading, empty, and error states
+- [x] Backend tests for identity and the concurrency-safe JSON store (23 backend tests passing; 33 across both workspaces)
+- [ ] Backend tests for step ordering, state machine, caps, and retry safety — `projects.test.ts` covers ordering (locked 400), the terminal-`done` 409, and retry-after-failure; **the caps are still untested**
+- [ ] Frontend tests for component loading, empty, and error states — `usePipeline.test.ts` covers the hook's failed/409/locked/done paths; component-level loading and empty states are still uncovered
 - [x] Real test run captured and recorded in [[TESTING]]
 - [ ] Technical decisions and AI overrides documented in [[DECISIONS]]
 - [ ] Reviewer instructions and architecture written in [[README]]

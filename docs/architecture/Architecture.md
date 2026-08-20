@@ -51,9 +51,9 @@ it. Add a row here when a new feature note is created.
 | --- | --- | --- |
 | Storage engine — JSON on disk, locks, atomic writes | ✅ built | [[Storage]] |
 | Identity & session — passwordless login, `httpOnly` cookie | ✅ built | [[Identity]] |
-| Projects — create from pasted/uploaded text, list, ownership | ⏳ planned | [[Projects]] |
-| Pipeline runner — step state machine, guards, retry, recovery | ⏳ planned | [[Pipeline Runner]] |
-| Media delivery — serving portraits and illustrations through our API | ⏳ planned | [[Media]] |
+| Projects — create from pasted/uploaded text, list, ownership | ✅ built | [[Projects]] |
+| Pipeline runner — step state machine, guards, retry, recovery | ✅ built | [[Projects]] |
+| Media delivery — serving portraits and illustrations through our API | ✅ built | [[Projects]] |
 
 The step-by-step Gemini contract (models, prompts, JSON schemas, output paths) lives in
 [[Pipeline]], which is a spec rather than a feature note — it is derived from the cookbook and

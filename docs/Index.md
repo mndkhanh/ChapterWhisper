@@ -1,4 +1,4 @@
-﻿---
+---
 title: ChapterWhisper Hub
 aliases:
   - Home
@@ -41,9 +41,7 @@ One note per feature — API surface, invariants, known limits, and the tests th
 Add the note when the feature lands, and add a row to [[Architecture#Feature notes]].
 - [[Storage]] — JSON-on-disk engine: per-file mutex, atomic write-rename. ✅ built
 - [[Identity]] — Passwordless login, `httpOnly` session cookie, logout. ✅ built
-- [[Projects]] — Create from text, list, ownership. ⏳ planned
-- [[Pipeline Runner]] — Step state machine, 409 guard, retry, stranded recovery. ⏳ planned
-- [[Media]] — Serving portraits and illustrations through our own API. ⏳ planned
+- [[Projects]] — Manuscript projects, 5-step pipeline runner, concurrency & media. ✅ built
 
 ### 4. Tracking & Registry (`docs/tracking/`)
 - [[Progress]] — Milestone roadmap and interactive task checklist.

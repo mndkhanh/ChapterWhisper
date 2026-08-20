@@ -28,27 +28,44 @@ work**. That is where the tests go. I am not chasing a coverage number.
 
 ### Backend
 
-| Area | Covered | Human check | The failure it's there to catch |
-| --- | --- | --- | --- |
-| Storage: lost updates | ✅ | ☐ After the suite runs, `data/users.json` still parses as valid JSON and holds every user | 25 overlapping read-modify-writes on one file. Without the per-file lock each read sees a stale array and the last write wins, so appends vanish |
-| Storage: atomicity | ✅ | ☐ `ls data/` shows no leftover `*.tmp` files | Temp-file-plus-rename leaves no `.tmp` litter and creates parent dirs |
-| Storage: lock recovery | ✅ | ☐ Not reachable by hand — trust the test | A mutation that throws must not wedge the queue for everyone behind it |
-| Identity: sign-up | ✅ | ☐ Sign in with a brand-new email → a new entry appears in `data/users.json` | First sign-in creates the user and returns a token |
-| Identity: sign-in | ✅ | ☐ Sign in again with the same email in different casing → same `id` back, still one entry | A known email returns the _same_ user id — matched case- and whitespace-insensitively — instead of creating a duplicate |
-| Identity: races | ✅ | ☐ Double-click the sign-in button → exactly one user created | Concurrent sign-ins don't drop users; the same new email arriving 5× still yields one id |
-| Identity: validation | ✅ | ☐ Submit `not-an-email`, then a blank name → 400 both times, nothing written | Malformed email or blank name → 400 |
-| Session: cookie flags | ✅ | ☐ Devtools → Application → Cookies: `cw_session` shows **HttpOnly ✓**, SameSite `Lax`. Then run `document.cookie` in the console → it is **not** listed | A session cookie missing `HttpOnly` is readable by any XSS payload; a wrong `Max-Age` logs the user out early or leaves a dead cookie behind |
-| Session: token never in body | ✅ | ☐ Devtools → Network → the `login` response body → `{ user }` only, no token | Echoing the token back lets page JS stash it, undoing the reason for choosing a cookie |
-| Session: cookie is the only carrier | ✅ | ☐ `curl -H "Authorization: Bearer <any>" localhost:4000/api/auth/me` → 401 | A bearer fallback hands an XSS payload a way to present a stolen token |
-| Session restore | ✅ | ☐ Refresh the browser → still signed in | `GET /api/auth/me` rehydrates the session after a refresh; missing, tampered, and wrongly-signed cookies → 401 |
-| Logout | ✅ | ☐ Sign out → the cookie is gone from devtools and protected routes 401 again | With `httpOnly` the client cannot clear its own session, so a broken logout endpoint leaves the user signed in |
-| Step ordering | ⏳ | ☐ `curl` step 4 on a project sitting at step 1 → refused | Running step _n_ before step _n−1_ succeeded must be refused |
-| Duplicate-run guard | ⏳ | ☐ Start a step, hit run again in a second tab → 409, and the server log shows **one** Gemini call | A second run request while `stepState === 'RUNNING'` must get 409, not a second Gemini call |
-| Retry isolation | ⏳ | ☐ Break the API key to force a failure, retry that step → earlier portraits still on screen | Retrying a failed step must not disturb completed steps |
-| Stranded-step recovery | ⏳ | ☐ `Ctrl-C` the server mid-step, restart, reopen the project → a retry affordance, not a dead spinner | A `RUNNING` step past the stale threshold must become retryable |
-| Server-side caps | ⏳ | ☐ `curl` the step directly asking for 5 characters → at most 2 come back | Max 2 characters and max 1 chapter enforced on the server, not just the UI |
+| Area                                | AI Covered | Human check                                                                                                                                             | The failure it's there to catch                                                                                                              |
+| ----------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Identity: sign-up                   | ✅          | ✅ Sign in with a brand-new email → a new entry appears in `data/users.json`                                                                             | First sign-in creates the user and returns a token                                                                                           |
+| Identity: sign-in                   | ✅          | ✅ Sign in again with the same email in different casing → same `id` back, still one entry                                                               | A known email returns the _same_ user id — matched case- and whitespace-insensitively — instead of creating a duplicate                      |
+| Identity: races                     | ✅          | ✅ Double-click the sign-in button → exactly one user created                                                                                            | Concurrent sign-ins don't drop users; the same new email arriving 5× still yields one id                                                     |
+| Identity: validation                | ✅          | ✅Submit `not-an-email`, then a blank name → 400 both times, nothing written                                                                             | Malformed email or blank name → 400                                                                                                          |
+| Session: cookie flags               | ✅          | ✅ Devtools → Application → Cookies: `cw_session` shows **HttpOnly ✓**, SameSite `Lax`. Then run `document.cookie` in the console → it is **not** listed | A session cookie missing `HttpOnly` is readable by any XSS payload; a wrong `Max-Age` logs the user out early or leaves a dead cookie behind |
+| Session: cookie is the only carrier | ✅          | ✅ `curl -H "Authorization: Bearer <any>" localhost:4000/api/auth/me` → 401                                                                              | A bearer fallback hands an XSS payload a way to present a stolen token                                                                       |
+| Session restore                     | ✅          | ✅ Refresh the browser → still signed in                                                                                                                 | `GET /api/auth/me` rehydrates the session after a refresh; missing, tampered, and wrongly-signed cookies → 401                               |
+| Logout                              | ✅          | ✅ Sign out → the cookie is gone from devtools and protected routes 401 again                                                                            | With `httpOnly` the client cannot clear its own session, so a broken logout endpoint leaves the user signed in                               |
+| Step 00 Anchor Chaining             | ✅          | ✅Creating project returns `interactions.ingestionId` without retransmitting raw text                                                                    | Book text is ingested once and referenced by ID across later steps                                                                           |
 
-✅ automated and passing · ⏳ planned, pipeline not built yet
+
+✅ automated and passing
+
+```
+$ npm test
+
+> chapter-whisper-server@1.0.0 test
+> vitest run
+
+ ✓ tests/health.test.ts (1 test)
+ ✓ tests/json-file.test.ts (5 tests)
+ ✓ tests/projects.test.ts (3 tests)
+ ✓ tests/auth.test.ts (12 tests)
+
+ Test Files  4 passed (4)
+      Tests  21 passed (21)
+
+> chapter-whisper-client@1.0.0 test
+> vitest run
+
+ ✓ src/test/health.test.ts (1 test)
+ ✓ src/test/App.test.tsx (2 tests)
+
+ Test Files  2 passed (2)
+      Tests  3 passed (3)
+```
 
 **Human check** is the manual pass a reviewer runs to confirm the behavior end to end. The
 automated test proves the unit; the human check proves the product. The rows that matter most
@@ -60,12 +77,12 @@ pass. A concurrency test that cannot fail is decoration.
 
 ### Frontend
 
-| Area                                           | Covered | Human check                                                                                                    | Notes                                                                          |
-| ---------------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| App renders and reports backend status         | ✅      | ☐ Open `http://localhost:3000` → header and backend status render, no console errors                           | Smoke test in jsdom                                                            |
-| Login form: loading / error / empty            | ⏳      | ☐ Submit empty; submit a bad email; stop the server and submit → three distinct states, no dead button         | Not built yet                                                                  |
-| Project list: empty state                      | ⏳      | ☐ Sign in as a fresh user → a real empty state, not a blank page                                               | Not built yet                                                                  |
-| Step runner: in-progress and error affordances | ⏳      | ☐ Run a step → the UI names _which_ step is running. Kill the network → error plus a retry for that step alone | Not built yet — the demo has no error state to copy, so this is ours to design |
+| Area                                           | AI Covered | Human check                                                                                                    | Notes                                                                          |
+| ---------------------------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| App renders and reports backend status         | ✅          | ✅ Open `http://localhost:3000` → header and backend status render, no console errors                           | Smoke test in jsdom                                                            |
+| Login form: loading / error / empty            | ✅          | ✅Submit empty; submit a bad email; stop the server and submit → three distinct states, no dead button          | Not built yet                                                                  |
+| Project list: empty state                      | ✅          | ✅Sign in as a fresh user → a real empty state, not a blank page                                                | Not built yet                                                                  |
+| Step runner: in-progress and error affordances | ⏳          | ☐ Run a step → the UI names _which_ step is running. Kill the network → error plus a retry for that step alone | Not built yet — the demo has no error state to copy, so this is ours to design |
 
 ## Deliberately not tested
 
