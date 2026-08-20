@@ -46,11 +46,14 @@ Complete map of all tracked source code, configuration, scripts, and documentati
 - [[server/src/auth/middleware.ts]] — `requireAuth` session-cookie guard (rejects bearer headers)
 - [[server/src/auth/routes.ts]] — `POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/logout`
 - [[server/src/gemini/client.ts]] — Gemini REST client (`/interactions` endpoint, structured JSON, output parsing)
-- [[server/src/projects/types.ts]] — Project, StepStatus, Character, Chapter interfaces & contracts
+- [[server/src/websocket.ts]] — WebSocket server: session auth, topic subscriptions & real-time broadcasting
+- [[server/src/projects/events.ts]] — Project event bus emitting live state updates
+- [[server/src/projects/types.ts]] — Project, StepStatus, Character, Chapter, StepAttempt interfaces & contracts
 - [[server/src/projects/project-store.ts]] — Thread-safe project JSON persistence & mutations
-- [[server/src/projects/pipeline-runner.ts]] — 5-step state machine runner, step 00 anchor ingestion & concurrency guards
+- [[server/src/projects/pipeline-runner.ts]] — 5-step state machine runner, step 00 anchor ingestion, attempt tracking & concurrency guards
 - [[server/src/projects/routes.ts]] — `POST /api/projects`, `GET /api/projects`, `POST /api/projects/:id/steps/:stepIndex/run`, media streaming routes
 - [[server/tests/health.test.ts]] — Server sanity test
+- [[server/tests/websocket.test.ts]] — WebSocket authentication and broadcast tests
 - [[server/tests/auth.test.ts]] — Identity: sign-in/sign-up, cookie flags, session restore, logout, races
 - [[server/tests/json-file.test.ts]] — Storage: lost-update, atomicity, lock recovery
 - [[server/tests/projects.test.ts]] — Projects & Pipeline API: step validation, step 00 anchor, auth guard
@@ -71,8 +74,9 @@ Complete map of all tracked source code, configuration, scripts, and documentati
 - [[client/src/components/auth/LoginScreen.tsx]] — Authentication entry point
 - [[client/src/components/library/LibraryView.tsx]] — Project management dashboard
 - [[client/src/components/new-project/NewProjectView.tsx]] — Project creation wizard
-- [[client/src/components/pipeline/PipelineStudio.tsx]] — Gemini pipeline orchestration
+- [[client/src/components/pipeline/PipelineStudio.tsx]] — Gemini pipeline orchestration & attempt history
 - [[client/src/components/result/ResultView.tsx]] — Generation output visualization
+- [[client/src/components/presentation/SlidePresentationModal.tsx]] — Interactive chapter slide deck presentation modal
 - [[client/src/App.tsx]] — Main React application root component
 - [[client/src/main.tsx]] — React DOM client entry point
 - [[client/src/types.ts]] — TypeScript interfaces for User, Project, Characters, Chapters & StepStatus

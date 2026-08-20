@@ -53,7 +53,9 @@ it. Add a row here when a new feature note is created.
 | Identity & session — passwordless login, `httpOnly` cookie | ✅ built | [[Identity]] |
 | Projects — create from pasted/uploaded text, list, ownership | ✅ built | [[Projects]] |
 | Pipeline runner — step state machine, guards, retry, recovery | ✅ built | [[Projects]] |
+| Real-time WebSocket — live step synchronization across tabs (`/ws`) | ✅ built | [[Projects]] |
 | Media delivery — serving portraits and illustrations through our API | ✅ built | [[Projects]] |
+| Slide Presentation Mode — 5-slide interactive reading deck & cards | ✅ built | [[Projects]] |
 
 The step-by-step Gemini contract (models, prompts, JSON schemas, output paths) lives in
 [[Pipeline]], which is a spec rather than a feature note — it is derived from the cookbook and

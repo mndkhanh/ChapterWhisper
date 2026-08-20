@@ -118,7 +118,7 @@ Each produced should be a simple image, no panels.
 - **Model**: `gemini-3.7-flash` with structured JSON schema.
 - **Prompt**:
   `"Pick the single most illustratable scene in the book and give me one prompt to illustrate it. It should be a single image, not a multi-tiled page. Be very descriptive, especially of the characters: tell their name and reuse the character prompts if they appear in the image. Also list all characters who appear in it."`
-- **Chaining**: `previous_interaction_id: project.interactions.portraitsId`
+- **Chaining**: `previous_interaction_id: project.interactions.charactersId` (chains from the text interaction history)
 - **Structured JSON Schema**:
   ```json
   {
