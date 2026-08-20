@@ -117,25 +117,31 @@ Each produced should be a simple image, no panels.
 - **Goal**: Extract exactly 1 key chapter scene for illustration, referencing established style and character visuals.
 - **Model**: `gemini-3.7-flash` with structured JSON schema.
 - **Prompt**:
-  `"Now, for each chapters of the book, give me a prompt to illustrate what happens in it. It should be a single image, not a multi-tiled page. Be very descriptive, especially of the characters. Be very descriptive and remember to tell their name and to reuse the character prompts if they appear in the images. Also list all characters who appear in it."`
+  `"Pick the single most illustratable scene in the book and give me one prompt to illustrate it. It should be a single image, not a multi-tiled page. Be very descriptive, especially of the characters: tell their name and reuse the character prompts if they appear in the image. Also list all characters who appear in it."`
 - **Chaining**: `previous_interaction_id: project.interactions.portraitsId`
 - **Structured JSON Schema**:
   ```json
   {
-    "type": "array",
-    "items": {
-      "type": "object",
-      "properties": {
-        "name": { "type": "string" },
-        "prompt": { "type": "string" },
-        "characters": { "type": "array", "items": { "type": "string" } }
-      },
-      "required": ["name", "prompt"]
-    }
+    "type": "object",
+    "properties": {
+      "name": { "type": "string" },
+      "prompt": { "type": "string" },
+      "characters": { "type": "array", "items": { "type": "string" } }
+    },
+    "required": ["name", "prompt"]
   }
   ```
-- **Server-Side Enforcement**: Strictly sliced to **max 1 chapter**.
+- **Server-Side Enforcement**: the model is asked for exactly one scene rather than one per
+  chapter. A response that comes back as an array anyway is truncated to its first element, so
+  the **max 1 chapter** cap holds either way.
 - **State Transition**: Step 4 (`ready` → `running` → `done`). Unlocks Step 5 (`ready`).
+
+> [!note] Deliberate deviation from the cookbook
+> The notebook asks for a prompt per chapter and then narrows to one. We ask for one scene up
+> front. Generating a prompt for every chapter of a full manuscript spends output tokens on work
+> the max-1-chapter cap discards immediately, and it was the only reason the UI ever needed a
+> chapter picker. **Step 04 takes no user input**: the model chooses the scene, and
+> `chapterIndex` is always 0.
 
 ---
 

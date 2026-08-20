@@ -107,27 +107,132 @@ describe('Projects & Pipeline API', () => {
     expect(after.body.project.interactions.styleId).toBe(styleId);
   });
 
-  it('still allows retrying a failed step', async () => {
+  it('executes Step 1 (Style), Step 2 (Characters), Step 3 (Portraits), and Step 4 (Chapters) sequentially', async () => {
+    const gemini = await import('../src/gemini/client.js');
+    const spy = vi.mocked(gemini.createInteraction);
+
+    // Mock Step 0 (ingest)
+    spy.mockResolvedValueOnce({
+      id: 'int_step0',
+      status: 'completed',
+      model: 'gemini-3.7-flash',
+      steps: [{ type: 'model', content: [{ type: 'text', text: 'INGESTED' }] }],
+    });
+
     const created = await supertest(app)
       .post('/api/projects')
       .set('Cookie', authCookie)
-      .send({ title: 'Retryable', bookText: 'A manuscript that fails once.' });
+      .send({
+        title: 'The Great Pipeline Voyage',
+        bookText: 'Mole and Ratty set off on a voyage along the riverbanks.',
+      });
     const pId = created.body.project.id;
+    expect(created.body.project.statuses[0]).toBe('ready');
 
-    const gemini = await import('../src/gemini/client.js');
-    const spy = vi.mocked(gemini.createInteraction);
-    spy.mockRejectedValueOnce(new Error('Gemini returned 500: high demand'));
-
-    const failed = await supertest(app)
+    // ── Test Step 1: Art Style ──
+    spy.mockResolvedValueOnce({
+      id: 'int_step1',
+      status: 'completed',
+      model: 'gemini-3.7-flash',
+      steps: [{ type: 'model', content: [{ type: 'text', text: 'Victorian Storybook Ink & Wash with rich sepia lines' }] }],
+    });
+    const step1Res = await supertest(app)
       .post(`/api/projects/${pId}/steps/0/run`)
       .set('Cookie', authCookie);
-    expect(failed.body.project.statuses[0]).toBe('failed');
+    expect(step1Res.status).toBe(200);
+    expect(step1Res.body.project.style).toContain('Victorian Storybook');
+    expect(step1Res.body.project.statuses[0]).toBe('done');
+    expect(step1Res.body.project.statuses[1]).toBe('ready');
 
-    // `failed` is not `done`, so the guard must not block the retry.
-    const retried = await supertest(app)
-      .post(`/api/projects/${pId}/steps/0/run`)
+    // ── Test Step 2: Characters (Max 2 Adults) ──
+    spy.mockResolvedValueOnce({
+      id: 'int_step2',
+      status: 'completed',
+      model: 'gemini-3.7-flash',
+      steps: [{
+        type: 'model',
+        content: [{
+          type: 'text',
+          text: JSON.stringify([
+            { name: 'Mole', description: 'Gentle scholar in velvet coat', prompt: 'A gentle mole with round spectacles' },
+            { name: 'Water Rat', description: 'Seasoned boatman with waistcoat', prompt: 'A water rat in nautical attire' },
+            { name: 'Extra Third Character', description: 'Should be sliced by server', prompt: 'Extra' },
+          ]),
+        }],
+      }],
+    });
+    const step2Res = await supertest(app)
+      .post(`/api/projects/${pId}/steps/1/run`)
       .set('Cookie', authCookie);
-    expect(retried.status).toBe(200);
-    expect(retried.body.project.statuses[0]).toBe('done');
+    expect(step2Res.status).toBe(200);
+    expect(step2Res.body.project.characters).toHaveLength(2); // Enforced max 2
+    expect(step2Res.body.project.characters[0].name).toBe('Mole');
+    expect(step2Res.body.project.characters[1].name).toBe('Water Rat');
+    expect(step2Res.body.project.statuses[1]).toBe('done');
+    expect(step2Res.body.project.statuses[2]).toBe('ready');
+
+    // ── Test Step 3: Character Portraits ──
+    // Spy for 2 characters: returns 1x1 transparent PNG base64
+    const samplePng = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+    spy.mockResolvedValueOnce({
+      id: 'int_step3_char1',
+      status: 'completed',
+      model: 'gemini-3.1-flash-image',
+      steps: [{
+        type: 'model',
+        content: [{ type: 'image', data: samplePng, mime_type: 'image/png' }],
+      }],
+    });
+    spy.mockResolvedValueOnce({
+      id: 'int_step3_char2',
+      status: 'completed',
+      model: 'gemini-3.1-flash-image',
+      steps: [{
+        type: 'model',
+        content: [{ type: 'image', data: samplePng, mime_type: 'image/png' }],
+      }],
+    });
+    const step3Res = await supertest(app)
+      .post(`/api/projects/${pId}/steps/2/run`)
+      .set('Cookie', authCookie);
+    expect(step3Res.status).toBe(200);
+    expect(step3Res.body.project.characters[0].portraitUrl).toBe(`/api/projects/${pId}/portraits/c1`);
+    expect(step3Res.body.project.characters[1].portraitUrl).toBe(`/api/projects/${pId}/portraits/c2`);
+    expect(step3Res.body.project.statuses[2]).toBe('done');
+    expect(step3Res.body.project.statuses[3]).toBe('ready');
+
+    // ── Test Step 4: Chapters (Max 1 Chapter Scene) ──
+    spy.mockResolvedValueOnce({
+      id: 'int_step4',
+      status: 'completed',
+      model: 'gemini-3.7-flash',
+      steps: [{
+        type: 'model',
+        content: [{
+          type: 'text',
+          text: JSON.stringify([
+            {
+              name: 'Chapter I: The River Bank',
+              prompt: 'Mole and Water Rat rowing a wicker boat along a sun-dappled stream.',
+              characters: ['Mole', 'Water Rat'],
+            },
+            {
+              name: 'Chapter II: The Open Road',
+              prompt: 'Should be sliced by server',
+              characters: ['Toad'],
+            },
+          ]),
+        }],
+      }],
+    });
+    const step4Res = await supertest(app)
+      .post(`/api/projects/${pId}/steps/3/run`)
+      .set('Cookie', authCookie);
+    expect(step4Res.status).toBe(200);
+    expect(step4Res.body.project.chapters).toHaveLength(1); // Enforced max 1 chapter
+    expect(step4Res.body.project.chapters[0].name).toBe('Chapter I: The River Bank');
+    expect(step4Res.body.project.chapters[0].characters).toEqual(['Mole', 'Water Rat']);
+    expect(step4Res.body.project.statuses[3]).toBe('done');
+    expect(step4Res.body.project.statuses[4]).toBe('ready');
   });
 });

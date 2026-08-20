@@ -224,41 +224,41 @@ async function runStep3Portraits(project: Project): Promise<Project> {
 }
 
 async function runStep4Chapters(project: Project): Promise<Project> {
+  // The cap is one chapter, so ask the model for one scene. Requesting a prompt
+  // for every chapter and discarding all but the first spent output tokens on
+  // work that was thrown away, and it is the only reason picking a chapter ever
+  // looked necessary. The model chooses the scene; the user chooses nothing.
   const schema = jsonSchemaFormat({
-    type: "array",
-    items: {
-      type: "object",
-      properties: {
-        name: { type: "string" },
-        prompt: { type: "string" },
-        characters: { type: "array", items: { type: "string" } },
-      },
-      required: ["name", "prompt"],
+    type: "object",
+    properties: {
+      name: { type: "string" },
+      prompt: { type: "string" },
+      characters: { type: "array", items: { type: "string" } },
     },
+    required: ["name", "prompt"],
   });
 
   const interaction = await createInteraction({
     model: getTextModel(),
     input:
-      "Now, for each chapters of the book, give me a prompt to illustrate what happens in it. It should be a single image, not a multi-tiled page. Be very descriptive, especially of the characters. Be very descriptive and remember to tell their name and to reuse the character prompts if they appear in the images. Also list all characters who appear in it.",
-    previous_interaction_id: project.interactions.portraitsId,
+      "Pick the single most illustratable scene in the book and give me one prompt to illustrate it. It should be a single image, not a multi-tiled page. Be very descriptive, especially of the characters: tell their name and reuse the character prompts if they appear in the image. Also list all characters who appear in it.",
+    previous_interaction_id:
+      project.interactions.charactersId ||
+      project.interactions.styleId ||
+      project.interactions.ingestionId,
     response_format: schema,
   });
 
-  const parsed = parseJsonOutput(interaction) as Array<{
-    name: string;
-    prompt: string;
-    characters?: string[];
-  }>;
-  const chapters = (parsed || []).slice(0, 1).map((ch, i) => ({
-    id: `ch${i + 1}`,
-    name: ch.name,
-    prompt: ch.prompt,
-    characters: ch.characters || [],
-  }));
+  type ChapterOut = { name: string; prompt: string; characters?: string[] };
+  const parsed = parseJsonOutput(interaction) as ChapterOut | ChapterOut[];
+  // Tolerate a model that answers with an array regardless; the cap still holds.
+  const ch = Array.isArray(parsed) ? parsed[0] : parsed;
+  if (!ch?.prompt) throw new Error("Gemini did not return a chapter scene");
 
   return await mutateProject(project.id, (p) => {
-    p.chapters = chapters;
+    p.chapters = [
+      { id: "ch1", name: ch.name, prompt: ch.prompt, characters: ch.characters || [] },
+    ];
     p.chapterIndex = 0;
     p.interactions.chaptersId = interaction.id;
     p.statuses[3] = "done";
@@ -269,7 +269,8 @@ async function runStep4Chapters(project: Project): Promise<Project> {
 }
 
 async function runStep5Illustration(project: Project): Promise<Project> {
-  const ch = project.chapters[project.chapterIndex ?? 0] || project.chapters[0];
+  // Exactly one chapter exists by construction — step 04 stores one.
+  const ch = project.chapters[0];
   if (!ch) throw new Error("No chapter defined to illustrate");
 
   const storageDir = path.join(
@@ -291,10 +292,13 @@ async function runStep5Illustration(project: Project): Promise<Project> {
   const { buffer } = outputImage(interaction);
   const filePath = path.join(storageDir, `${ch.id}.png`);
   await fs.writeFile(filePath, buffer);
-  ch.illustrationUrl = `/api/projects/${project.id}/illustrations/${ch.id}`;
 
   return await mutateProject(project.id, (p) => {
-    p.chapters = [ch];
+    // Merge inside the mutator rather than writing back an array that was read
+    // before the call, so a concurrent write to chapters is not lost.
+    const target = p.chapters[0];
+    if (target)
+      target.illustrationUrl = `/api/projects/${project.id}/illustrations/${ch.id}`;
     p.interactions.illustrationId = interaction.id;
     p.statuses[4] = "done";
     p.stepStartedAt = null;
