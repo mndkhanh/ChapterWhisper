@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { Project } from '../../types.js';
+import { SlidePresentationModal } from '../presentation/SlidePresentationModal.js';
 
 interface ResultViewProps {
   project: Project;
@@ -12,14 +13,25 @@ export const ResultView: React.FC<ResultViewProps> = ({
   onBackToPipeline,
   onReturnLibrary,
 }) => {
+  const [isPresentationOpen, setIsPresentationOpen] = useState(false);
   const currentChapter = project.chapters[project.chapterIndex ?? 0] || project.chapters[0];
 
   return (
     <main className="max-w-7xl mx-auto px-8 py-16">
-      <div className="flex items-center gap-2 text-[11px] tracking-[0.25em] text-[#d49653] font-semibold uppercase mb-3">
-        <span className="w-2 h-2 rounded-full bg-[#d49653]" />
-        <span>MASTERWORK EDITION · CHAPTER ILLUSTRATED</span>
+      <div className="flex items-center justify-between gap-4 flex-wrap mb-4">
+        <div className="flex items-center gap-2 text-[11px] tracking-[0.25em] text-[#d49653] font-semibold uppercase">
+          <span className="w-2 h-2 rounded-full bg-[#d49653]" />
+          <span>MASTERWORK EDITION · CHAPTER ILLUSTRATED</span>
+        </div>
+        <button
+          onClick={() => setIsPresentationOpen(true)}
+          className="bg-[#d49653] hover:bg-[#c38542] text-[#292622] font-semibold px-5 py-2.5 rounded-[2px] text-xs tracking-[0.18em] uppercase transition-all shadow-sm flex items-center gap-2 cursor-pointer"
+        >
+          <span>✦</span>
+          <span>Present Chapter Slides</span>
+        </button>
       </div>
+
       <h1 className="font-serif font-light uppercase text-6xl md:text-8xl tracking-tight text-[#2c2c2c] mb-12">
         {project.title}
       </h1>
@@ -29,8 +41,8 @@ export const ResultView: React.FC<ResultViewProps> = ({
         <div className="border border-[#b6ab9c] bg-[#d8cbb8] p-8 shadow-md">
           <div className="aspect-[16/10] plate-canvas border border-[#b6ab9c] flex flex-col justify-between p-8 relative overflow-hidden">
             <div className="flex items-center justify-between z-10">
-              <span className="text-[11px] tracking-[0.2em] font-semibold text-[#292622]/60 uppercase">
-                FIRST EDITION COMPOSITION PLATE
+              <span className="text-[11px] tracking-[0.2em] font-semibold text-[#292622]/60 uppercase truncate max-w-sm">
+                {project.title}
               </span>
               <span className="text-[11px] tracking-widest font-mono text-[#292622]/60">
                 {project.style || 'Ink & Wash'}
@@ -117,6 +129,12 @@ export const ResultView: React.FC<ResultViewProps> = ({
 
           <div className="flex flex-col gap-3.5 mt-4">
             <button
+              onClick={() => setIsPresentationOpen(true)}
+              className="bg-[#d49653] hover:bg-[#c38542] text-[#292622] font-semibold rounded-[2px] py-4 text-xs tracking-[0.2em] uppercase transition-all cursor-pointer shadow-sm text-center"
+            >
+              ✦ Present Slide Deck
+            </button>
+            <button
               onClick={onBackToPipeline}
               className="bg-[#2c2c2c] hover:bg-[#292622] text-[#d8cbb8] hover:text-[#d49653] transition-all rounded-[2px] py-4 text-xs font-semibold tracking-[0.2em] uppercase cursor-pointer shadow-sm"
             >
@@ -131,8 +149,12 @@ export const ResultView: React.FC<ResultViewProps> = ({
           </div>
         </aside>
       </div>
+
+      <SlidePresentationModal
+        project={project}
+        isOpen={isPresentationOpen}
+        onClose={() => setIsPresentationOpen(false)}
+      />
     </main>
   );
 };
-
-

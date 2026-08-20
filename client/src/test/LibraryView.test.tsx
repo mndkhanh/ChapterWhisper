@@ -31,7 +31,15 @@ const sampleProjects: Project[] = [
     chapterIndex: 0,
     statuses: ['done', 'done', 'done', 'done', 'done'],
     characters: [],
-    chapters: [],
+    chapters: [
+      {
+        id: 'ch_vol',
+        name: 'The Climax',
+        prompt: 'Golden sunrise over mountains',
+        characters: [],
+        illustrationUrl: '/api/projects/p_2/illustrations/ch_vol',
+      },
+    ],
     interactions: { ingestionId: 'int_2' },
   },
 ];
@@ -71,11 +79,39 @@ describe('LibraryView Component', () => {
     expect(screen.getByText('STEP 03')).toBeInTheDocument();
     expect(screen.getByText('2 / 5 plates')).toBeInTheDocument();
 
-    expect(screen.getByText('Completed Volume')).toBeInTheDocument();
+    expect(screen.getAllByText('Completed Volume').length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText('COMPLETE')).toBeInTheDocument();
     expect(screen.getByText('5 / 5 plates')).toBeInTheDocument();
+    expect(screen.getByAltText('Completed Volume')).toHaveAttribute('src', '/api/projects/p_2/illustrations/ch_vol');
 
     fireEvent.click(screen.getByText('The Great Odyssey'));
     expect(onOpenProject).toHaveBeenCalledWith('p_1');
+  });
+
+  it('launches slide presentation modal when Present Slides button in chapter box is clicked', () => {
+    const onOpenProject = vi.fn();
+    render(
+      <LibraryView
+        user={mockUser}
+        projects={sampleProjects}
+        onOpenProject={onOpenProject}
+        onNewProject={() => {}}
+      />,
+    );
+
+    const presentBtns = screen.getAllByRole('button', { name: /Present Slides/i });
+    expect(presentBtns.length).toBe(2);
+
+    fireEvent.click(presentBtns[0]);
+
+    // Slide deck modal should be open for The Great Odyssey without opening atelier
+    expect(onOpenProject).not.toHaveBeenCalled();
+    expect(screen.getByText('CHAPTER PRESENTATION')).toBeInTheDocument();
+    expect(screen.getAllByText('The Great Odyssey').length).toBeGreaterThanOrEqual(2);
+
+    // Close presentation modal
+    const exitBtn = screen.getByRole('button', { name: /✕ Exit/i });
+    fireEvent.click(exitBtn);
+    expect(screen.queryByText('CHAPTER PRESENTATION')).not.toBeInTheDocument();
   });
 });

@@ -6,7 +6,7 @@ import type { Project } from '../types.js';
 const completedProject: Project = {
   id: 'p_done',
   title: 'Treasure Island',
-  bookText: 'Full text',
+  bookText: 'Full text manuscript for Treasure Island story.',
   wordCount: 5000,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
@@ -58,7 +58,7 @@ describe('ResultView Component', () => {
     );
 
     expect(screen.getByText(/MASTERWORK EDITION · CHAPTER ILLUSTRATED/i)).toBeInTheDocument();
-    expect(screen.getByText('Treasure Island')).toBeInTheDocument();
+    expect(screen.getAllByText('Treasure Island').length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText('Long John Silver')).toBeInTheDocument();
     expect(screen.getByText('Jim Hawkins')).toBeInTheDocument();
     expect(screen.getByText('The Skeleton Island')).toBeInTheDocument();
@@ -84,5 +84,34 @@ describe('ResultView Component', () => {
     const libraryBtn = screen.getByRole('button', { name: /Return to Library/i });
     fireEvent.click(libraryBtn);
     expect(onReturnLibrary).toHaveBeenCalled();
+  });
+
+  it('opens chapter slide presentation deck and navigates through slides', () => {
+    render(
+      <ResultView
+        project={completedProject}
+        onBackToPipeline={() => {}}
+        onReturnLibrary={() => {}}
+      />,
+    );
+
+    const presentBtn = screen.getByRole('button', { name: /Present Chapter Slides/i });
+    fireEvent.click(presentBtn);
+
+    // Slide 1 should be visible
+    expect(screen.getByText('CHAPTER PRESENTATION')).toBeInTheDocument();
+    expect(screen.getByText('SLIDE 01 / 05')).toBeInTheDocument();
+    expect(screen.getByText('PROLOGUE & MANUSCRIPT')).toBeInTheDocument();
+
+    // Advance to Slide 2
+    const nextBtn = screen.getByRole('button', { name: /Next/i });
+    fireEvent.click(nextBtn);
+    expect(screen.getByText('SLIDE 02 / 05')).toBeInTheDocument();
+    expect(screen.getByText(/DRAMATIS PERSONAE/i)).toBeInTheDocument();
+
+    // Close presentation
+    const exitBtn = screen.getByRole('button', { name: /✕ Exit/i });
+    fireEvent.click(exitBtn);
+    expect(screen.queryByText('CHAPTER PRESENTATION')).not.toBeInTheDocument();
   });
 });
