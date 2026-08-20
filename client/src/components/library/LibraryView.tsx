@@ -5,6 +5,8 @@ import { SlidePresentationModal } from '../presentation/SlidePresentationModal.j
 interface LibraryViewProps {
   user: User | null;
   projects: Project[];
+  /** True while the first `GET /api/projects` is still in flight. */
+  loading?: boolean;
   onOpenProject: (id: string) => void;
   onNewProject: () => void;
 }
@@ -12,6 +14,7 @@ interface LibraryViewProps {
 export const LibraryView: React.FC<LibraryViewProps> = ({
   user,
   projects,
+  loading = false,
   onOpenProject,
   onNewProject,
 }) => {
@@ -35,6 +38,45 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           + Begin a New Chapter
         </button>
       </div>
+
+      {/* Loading — the shelf is fetched, so say so rather than showing a void. */}
+      {loading && projects.length === 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-10" aria-hidden="true">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="border border-[#b6ab9c] p-6 md:p-8 min-h-[300px] flex flex-col justify-between">
+              <div>
+                <div className="skeleton h-4 w-20 mb-6 rounded-[2px]" />
+                <div className="skeleton h-8 w-4/5 mb-3 rounded-[2px]" />
+                <div className="skeleton h-3 w-2/3 rounded-[2px]" />
+              </div>
+              <div className="skeleton h-1 w-full rounded-full" />
+            </div>
+          ))}
+        </div>
+      )}
+      {loading && projects.length === 0 && (
+        <p className="sr-only" role="status">Loading your library…</p>
+      )}
+
+      {/* Empty — a first-time author would otherwise see a heading and nothing. */}
+      {!loading && projects.length === 0 && (
+        <div className="mt-10 border border-dashed border-[#978e81] bg-[#bfb4a3]/15 px-8 py-16 text-center">
+          <div className="font-serif font-light text-4xl md:text-5xl text-[#2c2c2c] mb-4">
+            The shelf is empty
+          </div>
+          <p className="text-sm text-[#615b53] max-w-md mx-auto leading-relaxed mb-8">
+            Paste a chapter or upload a <span className="font-mono text-xs">.txt</span> manuscript and
+            ChapterWhisper will carry it through five steps — style, cast, portraits, scene, and the
+            final composition plate.
+          </p>
+          <button
+            onClick={onNewProject}
+            className="bg-[#2c2c2c] hover:bg-[#292622] text-[#d8cbb8] hover:text-[#d49653] transition-all rounded-[2px] px-8 py-4 text-xs font-semibold tracking-[0.2em] uppercase cursor-pointer shadow-sm"
+          >
+            Commit Your First Manuscript →
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-10">
         {projects.map((p) => {

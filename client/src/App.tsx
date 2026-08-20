@@ -19,6 +19,7 @@ export function App() {
   const [npTitle, setNpTitle] = useState('');
   const [npText, setNpText] = useState('');
   const [uploadHint, setUploadHint] = useState('accepts a single .txt manuscript');
+  const [opening, setOpening] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimeout = useRef<number | undefined>(undefined);
 
@@ -31,15 +32,37 @@ export function App() {
   }, []);
 
   // 1. Auth
-  const { user, login, logout } = useAuth(showToast);
+  const { user, loading: authLoading, login, logout } = useAuth(showToast);
+
+  /**
+   * Whether this browser has signed in before. `useAuth` needs a round trip to
+   * `/api/auth/me` to know if the cookie is still good, and rendering the login
+   * screen during that wait flashed it at every returning user on every
+   * refresh. The cached display user is the cheap local answer to "is a session
+   * plausible?", so only those visitors wait on a splash.
+   */
+  const [hadSession] = useState(() => {
+    try {
+      return Boolean(localStorage.getItem('cw_user'));
+    } catch {
+      return false;
+    }
+  });
 
   React.useEffect(() => {
     if (user && screen === 'login') setScreen('projects');
   }, [user, screen]);
 
   // 2. Projects — server-backed
-  const { projects, creating, activeProject, createProject, openProject, applyProject } =
-    useProjects(user, showToast);
+  const {
+    projects,
+    loading: projectsLoading,
+    creating,
+    activeProject,
+    createProject,
+    openProject,
+    applyProject,
+  } = useProjects(user, showToast);
 
   // 3. Pipeline — server-backed
   const {
@@ -100,29 +123,54 @@ export function App() {
     }
   };
 
+  /** Shared by the file picker and the drop target. */
+  const readManuscriptFile = useCallback(
+    (file: File) => {
+      const isText = file.type.startsWith('text/') || /\.txt$/i.test(file.name);
+      if (!isText) {
+        showToast(`${file.name} is not a .txt manuscript — please choose a plain text file`);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const text = (ev.target?.result as string) ?? '';
+        const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+        setNpText(text);
+        setUploadHint(`${file.name} · ${words.toLocaleString()} words loaded`);
+        showToast('Manuscript file loaded');
+      };
+      reader.onerror = () => showToast(`Could not read ${file.name}`);
+      reader.readAsText(file);
+    },
+    [showToast],
+  );
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const text = (ev.target?.result as string) ?? '';
-      setNpText(text);
-      setUploadHint(`${file.name} · ${text.split(/\s+/).length.toLocaleString()} words loaded`);
-      showToast('Manuscript file loaded');
-    };
-    reader.readAsText(file);
+    if (file) readManuscriptFile(file);
   };
 
   /** Opens a project and lands on the step the server says is next. */
-  const handleOpenProject = async (id: string) => {
-    setScreen('pipeline');
-    const p = await openProject(id);
-    if (!p) return;
-    let idx = p.statuses.findIndex((s) => s === 'running' || s === 'failed');
-    if (idx === -1) idx = p.statuses.indexOf('ready');
-    if (idx === -1) idx = Math.max(0, p.statuses.lastIndexOf('done'));
-    setStepIndex(idx);
-  };
+  const handleOpenProject = useCallback(
+    async (id: string) => {
+      setScreen('pipeline');
+      setOpening(true);
+      try {
+        const p = await openProject(id);
+        if (!p) {
+          setScreen('projects');
+          return;
+        }
+        let idx = p.statuses.findIndex((s) => s === 'running' || s === 'failed');
+        if (idx === -1) idx = p.statuses.indexOf('ready');
+        if (idx === -1) idx = Math.max(0, p.statuses.lastIndexOf('done'));
+        setStepIndex(idx);
+      } finally {
+        setOpening(false);
+      }
+    },
+    [openProject, setStepIndex],
+  );
 
   const goNew = () => {
     setScreen('new');
@@ -130,6 +178,21 @@ export function App() {
     setNpText('');
     setUploadHint('accepts a single .txt manuscript');
   };
+
+  // A returning author waits on this instead of a flash of the login screen.
+  if (authLoading && hadSession && !user) {
+    return (
+      <div className="min-h-screen bg-[#292622] text-[#d8cbb8] flex flex-col items-center justify-center gap-6">
+        <div className="w-10 h-10 border border-[#d8cbb8]/60 flex items-center justify-center font-serif text-sm tracking-widest">
+          CW
+        </div>
+        <div className="flex items-center gap-2.5 text-[11px] tracking-[0.25em] uppercase text-[#978e81]" role="status">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#d49653] animate-pulse" />
+          Restoring your session
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#d8cbb8] text-[#2c2c2c] font-sans selection:bg-[#d49653] selection:text-[#292622]">
@@ -157,6 +220,7 @@ export function App() {
             <LibraryView
               user={user}
               projects={projects}
+              loading={projectsLoading}
               onOpenProject={handleOpenProject}
               onNewProject={goNew}
             />
@@ -171,8 +235,29 @@ export function App() {
               onTitleChange={setNpTitle}
               onTextChange={setNpText}
               onFileUpload={handleFileUpload}
+              onFileDrop={readManuscriptFile}
               onCreate={handleCreateProjectSubmit}
             />
+          )}
+
+          {screen === 'pipeline' && !displayProject && (
+            <main className="max-w-7xl mx-auto px-8 py-10 grid grid-cols-1 md:grid-cols-[270px_1fr] gap-14 items-start">
+              <div className="flex flex-col gap-3" aria-hidden="true">
+                <div className="skeleton h-7 w-3/4 mb-3 rounded-[2px]" />
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <div key={i} className="skeleton h-12 w-full rounded-[2px]" />
+                ))}
+              </div>
+              <div className="flex flex-col gap-4">
+                <div className="skeleton h-3 w-24 rounded-[2px]" />
+                <div className="skeleton h-14 w-2/3 rounded-[2px]" />
+                <div className="skeleton h-4 w-full max-w-xl rounded-[2px]" />
+                <div className="skeleton h-64 w-full rounded-[2px] mt-4" />
+                <p className="text-[11px] tracking-[0.2em] uppercase text-[#978e81] mt-2" role="status">
+                  {opening ? 'Opening the atelier…' : 'Loading the project…'}
+                </p>
+              </div>
+            </main>
           )}
 
           {screen === 'pipeline' && displayProject && (

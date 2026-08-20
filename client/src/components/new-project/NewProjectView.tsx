@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 const META = [
   { num: '01', title: 'Art Style', desc: 'Choose the visual language the whole book will inherit.' },
@@ -17,6 +17,11 @@ interface NewProjectViewProps {
   onTitleChange: (val: string) => void;
   onTextChange: (val: string) => void;
   onFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  /**
+   * Handles a file dropped onto the upload panel. Optional so the panel keeps
+   * working as a plain picker if a caller does not wire it.
+   */
+  onFileDrop?: (file: File) => void;
   onCreate: () => void;
 }
 
@@ -28,8 +33,19 @@ export const NewProjectView: React.FC<NewProjectViewProps> = ({
   onTitleChange,
   onTextChange,
   onFileUpload,
+  onFileDrop,
   onCreate,
-}) => (
+}) => {
+  const [dragging, setDragging] = useState(false);
+
+  const handleDrop = (e: React.DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    setDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file && onFileDrop) onFileDrop(file);
+  };
+
+  return (
   <main className="max-w-6xl mx-auto px-8 py-14">
     <div className="text-xs tracking-[0.2em] text-[#978e81] font-semibold uppercase mb-4">Commit a Manuscript</div>
     <h1 className="font-serif font-light uppercase text-6xl md:text-8xl tracking-tight mb-10">A New Chapter</h1>
@@ -63,10 +79,27 @@ export const NewProjectView: React.FC<NewProjectViewProps> = ({
           <div className="flex-1 h-px bg-[#b6ab9c]" />
         </div>
 
-        <label className="block border border-dashed border-[#978e81] hover:border-[#d49653] transition-colors rounded-[3px] p-8 text-center cursor-pointer bg-[#bfb4a3]/20">
-          <input type="file" accept=".txt" onChange={onFileUpload} className="hidden" />
+        {/* The copy promised a drop target long before there was one — these
+            handlers are what make the affordance honest. */}
+        <label
+          onDragOver={(e) => {
+            e.preventDefault();
+            if (onFileDrop) setDragging(true);
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={handleDrop}
+          className={
+            'block border border-dashed rounded-[3px] p-8 text-center cursor-pointer transition-colors ' +
+            (dragging
+              ? 'border-[#d49653] bg-[#d49653]/10'
+              : 'border-[#978e81] hover:border-[#d49653] bg-[#bfb4a3]/20')
+          }
+        >
+          <input type="file" accept=".txt,text/plain" onChange={onFileUpload} className="hidden" />
           <div className="font-serif font-light text-2xl mb-1">Drop or select a .txt file</div>
-          <div className="text-xs text-[#978e81]">{uploadHint}</div>
+          <div className={'text-xs ' + (dragging ? 'text-[#d49653] font-semibold' : 'text-[#978e81]')}>
+            {dragging ? 'Release to load the manuscript' : uploadHint}
+          </div>
         </label>
 
         {/* Step 00 — the manuscript is sent to Gemini exactly once, here. */}
@@ -111,6 +144,7 @@ export const NewProjectView: React.FC<NewProjectViewProps> = ({
           The manuscript is sent once, then reused across every step. Bounded by server caps: max 2 adult characters and 1 chapter illustration.
         </p>
       </aside>
-    </div>
-  </main>
-);
+      </div>
+    </main>
+  );
+};

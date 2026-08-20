@@ -13,7 +13,9 @@ import * as api from '../api/projects.js';
 export function useProjects(user: User | null, onToast: (msg: string) => void) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  // Starts true so the library renders its skeleton on first paint rather than
+  // flashing the empty state before the first fetch resolves.
+  const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
 
   const activeProject = projects.find((p) => p.id === activeId);
@@ -40,6 +42,7 @@ export function useProjects(user: User | null, onToast: (msg: string) => void) {
     if (!user) {
       setProjects([]);
       setActiveId(null);
+      setLoading(false);
       return;
     }
     void refresh();

@@ -63,3 +63,33 @@
 }
 
 
+/* Modal entrance. `animate-fade-in` was used by SlidePresentationModal before
+   this keyframe existed, so the class silently did nothing. */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.25s ease-out;
+}
+
+/* Placeholder shimmer for the library and pipeline loading states. */
+@keyframes shimmer {
+  0%   { opacity: 0.45; }
+  50%  { opacity: 0.8; }
+  100% { opacity: 0.45; }
+}
+
+.skeleton {
+  background-color: #bfb4a3;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee,
+  .animate-fade-in,
+  .skeleton {
+    animation: none;
+  }
+}
