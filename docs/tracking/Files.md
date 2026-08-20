@@ -31,6 +31,7 @@ Complete map of all tracked source code, configuration, scripts, and documentati
 - [[Storage.md|docs/features/Storage.md]] — Feature: JSON storage engine, locks & atomic writes
 - [[Identity.md|docs/features/Identity.md]] — Feature: passwordless auth & `httpOnly` session
 - [[Projects.md|docs/features/Projects.md]] — Feature: projects API, pipeline runner & media streaming
+- [[Feedback States.md|docs/features/Feedback States.md]] — Feature: client loading, empty, in-progress & error states
 - [[Progress.md|docs/tracking/Progress.md]] — Milestone tracker & roadmap
 - [[DESIGN.md|docs/design/DESIGN.md]] — Amrit Palace visual design tokens
 - [[Files.md|docs/tracking/Files.md]] — This file registry
@@ -80,7 +81,8 @@ Complete map of all tracked source code, configuration, scripts, and documentati
 - [[client/src/App.tsx]] — Main React application root component
 - [[client/src/main.tsx]] — React DOM client entry point
 - [[client/src/types.ts]] — TypeScript interfaces for User, Project, Characters, Chapters & StepStatus
-- [[client/src/index.css]] — Global stylesheet & design token classes
+- [[client/public/styles/]] — Sample plates for the five step 01 art-style presets (ink-wash, golden-age, etching, woodcut, storybook)
+- [[client/src/index.css]] — Global stylesheet, design token classes, `fadeIn`/`shimmer` keyframes & reduced-motion block
 - [[client/src/vite-env.d.ts]] — Vite client type declarations (`import.meta.env`)
 - [[client/src/test/health.test.ts]] — Client environment sanity & ApiError test
 - [[client/src/test/useAuth.test.ts]] — Auth hook unit test: session hydration, login, logout & localStorage sync

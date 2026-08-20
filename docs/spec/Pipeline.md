@@ -70,6 +70,19 @@ Each produced should be a simple image, no panels.
 - **Output**: Visual style description string stored on `project.style`.
 - **State Transition**: Step 1 (`ready` → `running` → `done`). Unlocks Step 2 (`ready`).
 
+> [!note] The presets are client-side, and the description box leads
+> `DEFAULT_STYLES` in `client/src/components/pipeline/PipelineStudio.tsx` offers five fail-safe
+> presets — Ink & Wash, Golden-Age Oil, Etching, Woodcut, Storybook, the same five the login
+> marquee advertises. Each carries a sample plate from `client/public/styles/`, served by Vite
+> as a static asset rather than imported, so the card shows the style instead of naming it.
+> They are browser-side only: whichever name is staged is posted as the
+> `{ style }` body when the step runs, which is why the server has no "set style" endpoint and
+> why a staged style is a selection rather than project state until Generate is pressed. The
+> preset that is already staged clears it, so "no style" stays reachable without a reload. The
+> free-text description box sits **above** the preset grid — describing a style is the
+> expressive path and the presets are the fallback. Skipping both is the third supported route
+> and lets the model derive a style from the manuscript ([[DECISIONS]] §2).
+
 ---
 
 ## Step 02: Characters Extraction (Max 2 Adults)

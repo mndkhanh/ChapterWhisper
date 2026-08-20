@@ -60,6 +60,10 @@ Tracking active implementation milestones, verification status, and deliverable 
 - [x] Backend tests for step ordering, state machine, caps, and retry safety (`projects.test.ts`, `pipeline.test.ts`, `websocket.test.ts`, `auth.test.ts`, `json-file.test.ts`)
 - [x] Frontend tests for all views, hooks, presentation mode, and pipeline state machine (34 client tests passing)
 - [x] Real test run captured and recorded in [[TESTING]]
+- [x] Client feedback pass — session splash, library skeleton/empty state, pipeline open skeleton, running banner with elapsed clock, live-region dismissible toasts, working drop target ([[Feedback States]])
+- [x] Studio step 01 — five presets (Ink & Wash, Golden-Age Oil, Etching, Woodcut, Storybook), free-text description box promoted above the preset grid ([[Pipeline]] §Step 01)
+- [x] Studio layout — one action cluster top-right of the step heading: Back, plus a primary slot that is Generate/Retry while there is work to do and becomes Next Step / View the Plate once the step is done (no disabled "complete" button; the rail reports DONE)
+- [ ] Client accessibility pass — focus-visible styling, `div`-to-`button` conversions, dialog semantics for the slide modal
 - [x] Technical decisions and AI overrides documented in [[DECISIONS]]
 - [x] Reviewer instructions, features, and setup written in [[README]]
 - [x] Orientation and cross-cutting rules updated in [[CLAUDE.md]]
