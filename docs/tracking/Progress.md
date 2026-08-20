@@ -22,7 +22,7 @@ Tracking active implementation milestones, verification status, and deliverable 
 - [x] Environment configuration (`.env.example`)
 
 ## Milestone 2: Backend Architecture & Storage
-- [x] User authentication (passwordless JWT with email + name) — `POST /api/auth/login`, `GET /api/auth/me`
+- [x] User authentication (passwordless, email + name; JWT in an `httpOnly` cookie) — login / me / logout
 - [x] Local JSON file storage engine with per-file mutex locks and atomic write-rename
 - [ ] Media & file streaming storage for raw text, portraits, and illustrations
 - [ ] Server-side validation for step transitions and project ownership

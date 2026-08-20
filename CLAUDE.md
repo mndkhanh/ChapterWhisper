@@ -25,9 +25,12 @@ normal search/read/edit tools on `docs/`; the Obsidian app is just one view of t
 2. **Search the notes first.** Grep `docs/` for the concept before grepping `server/` or
    `client/` — note titles, `aliases:`, and `tags:` in the frontmatter are the search surface.
    A decision already made lives in a note, and re-deriving it from code gets it wrong.
-3. **Read the owning note in full.** `Pipeline.md` owns step mechanics, `Architecture.md` owns
-   storage and concurrency, `DESIGN.md` owns visual tokens, `PRD.md` owns everything and wins
-   any conflict.
+3. **Read the owning note in full.** `docs/features/<Feature>.md` owns whatever that feature
+   does; `Pipeline.md` owns step mechanics; `Architecture.md` owns only cross-cutting rules and
+   the feature index; `DESIGN.md` owns visual tokens; `PRD.md` owns everything and wins any
+   conflict.
+   **When you build a new feature, create its feature note** and add a row to
+   `Architecture.md`'s feature table — don't grow `Architecture.md` itself.
 4. **Then write the code.**
 5. **Write the result back into the vault, in the same change.** Update the owning note if the
    design shifted, tick the box in `docs/tracking/Progress.md`, and register new files in
@@ -72,7 +75,8 @@ docs in that format and register them in `docs/tracking/Files.md`.
 | `docs/Index.md`                           | Vault hub (MOC) — structure, active stack, key decisions. Start here                                                                                                           |
 | `docs/spec/PRD.md`                        | The assessment brief. **Source of truth**; read before any design call                                                                                                         |
 | `docs/spec/Pipeline.md`                   | Per-step contract: model, input, JSON schema, output path, state transition for all 5 steps. **Read this before writing any pipeline code** — it is more specific than the PRD |
-| `docs/architecture/Architecture.md`       | Layer diagram, storage/state model, concurrency guards                                                                                                                         |
+| `docs/architecture/Architecture.md`       | System-level only: layer diagram, cross-cutting state model and concurrency guards, and the index of feature notes                                                              |
+| `docs/features/*.md`                      | **One note per feature** — API surface, invariants, known limits, tests. `Storage.md` and `Identity.md` are built; `Projects`, `Pipeline Runner`, `Media` are planned          |
 | `docs/design/DESIGN.md`                   | "Amrit Palace" tokens — parchment `#d8cbb8`, saffron `#d49653`, onyx `#2c2c2c`, Cormorant Garamond + Inter, 0px radius                                                         |
 | `docs/tracking/Progress.md`               | Milestone checklist — 5 milestones, roughly the intended build order                                                                                                           |
 | `docs/tracking/Files.md`                  | File registry; update it when adding files                                                                                                                                     |
@@ -112,8 +116,14 @@ client/  Vite 6 + React 18 + TS + Tailwind 3
   `STORAGE_DIR`. Writes must be mutex-guarded and atomic (write-temp + rename) — overlapping
   writes are the failure mode this design has to defend against. All of `data/` is gitignored.
 - **Auth is passwordless**: email + name only. Known email loads that user's projects, unknown
-  email creates the user. No password, no OAuth (`PRD.md:118`). `JWT_SECRET` / `JWT_EXPIRES_IN`
-  are already in `.env.example`; `jsonwebtoken` is already installed.
+  email creates the user. No password, no OAuth (`PRD.md:118`).
+- **The session is an `httpOnly` cookie** (`cw_session`), not a bearer token. Three rules that
+  follow from that choice and are each covered by a test — don't undo them casually:
+  the token is **never** returned in the response body; `requireAuth` reads the cookie **only**
+  and ignores `Authorization: Bearer`; and **logout must be a server call**
+  (`POST /api/auth/logout`), because the client physically cannot clear an `httpOnly` cookie.
+  Cookie `Max-Age` is derived from `JWT_EXPIRES_IN` so browser and token expire together.
+  CSRF defence is `SameSite=Lax` alone — no CSRF token, deliberately (see `TESTING.md`).
 - **Env lives in two places.** Root `.env` and `server/.env` are byte-identical copies of
   `.env.example`; `dotenv.config()` in `server/src/index.ts` resolves against the server's cwd,
   so `server/.env` is the one that actually loads under `npm run dev`. Keep them in sync or

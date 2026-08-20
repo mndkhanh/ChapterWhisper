@@ -1,4 +1,4 @@
-﻿---
+---
 title: System Architecture & Data Flow
 aliases:
   - Architecture
@@ -14,18 +14,19 @@ status: active
 
 # System Architecture & Data Flow
 
-High-level architecture for **ChapterWhisper**, designed for minimal overhead, strong concurrency safety, and full pipeline resumability.
+The system-level view: layers, cross-cutting rules, and where each feature lives. **Per-feature
+detail belongs in the feature notes below, not here** — this note stays readable as the app grows.
 
 ```
 ┌──────────────────────────────────────────────────────────┐
 │                      Client Layer                        │
 │   React (Vite + TypeScript + Tailwind "Amrit Palace")    │
 └────────────────────────────┬─────────────────────────────┘
-                             │  REST / JSON (JWT Auth)
+                             │  REST / JSON  ·  httpOnly session cookie
 ┌────────────────────────────▼─────────────────────────────┐
 │                      Server Layer                        │
 │   Node.js (Express + TypeScript)                         │
-│   ├─ Auth Controller & JWT Verification                  │
+│   ├─ Auth Controller & Session Guard                     │
 │   ├─ Project Controller & In-Flight Concurrency Guard    │
 │   ├─ Pipeline State Machine (Steps 1–5 Runner)           │
 │   └─ File & Media Streaming Controller                   │
@@ -41,23 +42,42 @@ High-level architecture for **ChapterWhisper**, designed for minimal overhead, s
 └───────────────────────┘         └───────────────────────┘
 ```
 
-## 1. Storage & State Model
+## Feature notes
 
-- **Zero Database Dependency**: Uses local JSON files on disk (`data/`), safe against concurrent writes via file mutex locks and atomic write-rename patterns.
-- **State Decomposition**:
-  - `status`: Discrete milestone (`CREATED` → `STYLE_SET` → `CHARACTERS_GENERATED` → `PORTRAITS_GENERATED` → `CHAPTERS_GENERATED` → `DONE`).
-  - `stepState`: Execution state (`IDLE`, `RUNNING`, `ERROR`).
-  - `stepStartedAt`: Timestamp for detecting and auto-recovering stranded/stale runs (> 2 minutes).
+Each feature owns its own note: API surface, invariants, known limits, and the tests that cover
+it. Add a row here when a new feature note is created.
 
-## 2. Gemini Pipeline Constraints (Enforced Server-Side)
+| Feature | Status | Note |
+| --- | --- | --- |
+| Storage engine — JSON on disk, locks, atomic writes | ✅ built | [[Storage]] |
+| Identity & session — passwordless login, `httpOnly` cookie | ✅ built | [[Identity]] |
+| Projects — create from pasted/uploaded text, list, ownership | ⏳ planned | [[Projects]] |
+| Pipeline runner — step state machine, guards, retry, recovery | ⏳ planned | [[Pipeline Runner]] |
+| Media delivery — serving portraits and illustrations through our API | ⏳ planned | [[Media]] |
 
-1. **Step 1 (Style)**: Text analysis or custom user style.
-2. **Step 2 (Characters)**: Max **2 adult characters** extracted with structured JSON schema.
-3. **Step 3 (Portraits)**: Sequential portrait image generation for identified characters.
-4. **Step 4 (Chapters)**: Max **1 chapter** prompt extracted referencing character visuals.
-5. **Step 5 (Illustrations)**: Scene composition illustration generated referencing character portraits.
+The step-by-step Gemini contract (models, prompts, JSON schemas, output paths) lives in
+[[Pipeline]], which is a spec rather than a feature note — it is derived from the cookbook and
+does not change as our code changes.
 
-## 3. Concurrency & Reliability Guards
+## Cross-cutting: state model
 
-- **Duplicate Call Guard**: When `stepState === 'RUNNING'`, all subsequent requests to run steps return `409 Conflict`, preventing duplicate Gemini API calls from double-clicks or multiple tabs.
-- **Crash Recovery**: Mid-step server restarts or browser refreshes preserve the exact state and provide a user-triggerable step retry without losing existing progress.
+Two fields, deliberately. One enum cannot express "step 3 done, step 4 currently running" —
+which is exactly what a mid-step refresh has to read.
+
+- `status` — the milestone: `CREATED` → `STYLE_SET` → `CHARACTERS_GENERATED` →
+  `PORTRAITS_GENERATED` → `CHAPTERS_GENERATED` → `DONE`
+- `stepState` — execution: `IDLE`, `RUNNING`, `ERROR`
+- `stepStartedAt` — timestamp used to detect a stranded run
+
+## Cross-cutting: concurrency & reliability guards
+
+- **Duplicate call guard.** While `stepState === 'RUNNING'`, further run requests for that
+  project return **409 Conflict**. This lives on the server, not in one browser tab, so a
+  refresh, a second tab, and a double-click are all covered.
+- **Crash recovery.** A mid-step server restart or browser refresh preserves the exact state and
+  offers a user-triggered retry without losing completed results.
+- **Stale runs clear the lock, they do not re-fire.** A `RUNNING` step past the stale threshold
+  becomes retryable by the user. A timeout that clears `stepState` is sanctioned; a timeout that
+  starts a fresh Gemini call on its own would violate the no-auto-retry rule in [[PRD]] §4.3.
+
+Related: [[Index]] · [[PRD]] · [[Pipeline]] · [[Progress]]

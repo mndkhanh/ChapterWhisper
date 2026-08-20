@@ -34,7 +34,16 @@ Style (01) ──► Characters (02) ──► Portraits (03) ──► Chapters
 - [[DESIGN]] — "Amrit Palace" visual reference (Warm parchment `#d8cbb8`, Saffron `#d49653`, Onyx `#2c2c2c`, serif typography).
 
 ### 3. Architecture & Data Flow (`docs/architecture/`)
-- [[Architecture]] — Node/Express + React architecture, atomic JSON storage model, and concurrency lock mechanics.
+- [[Architecture]] — System-level view: layers, cross-cutting state model and concurrency guards, and the index of feature notes.
+
+### 3b. Features (`docs/features/`)
+One note per feature — API surface, invariants, known limits, and the tests that cover it.
+Add the note when the feature lands, and add a row to [[Architecture#Feature notes]].
+- [[Storage]] — JSON-on-disk engine: per-file mutex, atomic write-rename. ✅ built
+- [[Identity]] — Passwordless login, `httpOnly` session cookie, logout. ✅ built
+- [[Projects]] — Create from text, list, ownership. ⏳ planned
+- [[Pipeline Runner]] — Step state machine, 409 guard, retry, stranded recovery. ⏳ planned
+- [[Media]] — Serving portraits and illustrations through our own API. ⏳ planned
 
 ### 4. Tracking & Registry (`docs/tracking/`)
 - [[Progress]] — Milestone roadmap and interactive task checklist.

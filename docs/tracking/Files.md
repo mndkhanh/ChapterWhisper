@@ -28,7 +28,9 @@ Complete map of all tracked source code, configuration, scripts, and documentati
 - [[Index.md|docs/Index.md]] — Main vault hub & Map of Content (MOC)
 - [[PRD.md|docs/spec/PRD.md]] — Full assessment requirements brief (Source of truth)
 - [[Pipeline.md|docs/spec/Pipeline.md]] — 5-step Gemini pipeline contract & prompt schemas
-- [[Architecture.md|docs/architecture/Architecture.md]] — System architecture & data flow
+- [[Architecture.md|docs/architecture/Architecture.md]] — System architecture, cross-cutting rules & feature index
+- [[Storage.md|docs/features/Storage.md]] — Feature: JSON storage engine, locks & atomic writes
+- [[Identity.md|docs/features/Identity.md]] — Feature: passwordless auth & `httpOnly` session
 - [[Progress.md|docs/tracking/Progress.md]] — Milestone tracker & roadmap
 - [[DESIGN.md|docs/design/DESIGN.md]] — Amrit Palace visual design tokens
 - [[Files.md|docs/tracking/Files.md]] — This file registry
@@ -40,10 +42,11 @@ Complete map of all tracked source code, configuration, scripts, and documentati
 - [[server/src/storage/json-file.ts]] — JSON store: per-file mutex + atomic write-rename
 - [[server/src/users/user-store.ts]] — `User` model & find-or-create by email
 - [[server/src/auth/jwt.ts]] — Token signing & verification
-- [[server/src/auth/middleware.ts]] — `requireAuth` bearer-token guard
-- [[server/src/auth/routes.ts]] — `POST /api/auth/login`, `GET /api/auth/me`
+- [[server/src/auth/cookie.ts]] — `httpOnly` session cookie name, flags & max-age
+- [[server/src/auth/middleware.ts]] — `requireAuth` session-cookie guard (rejects bearer headers)
+- [[server/src/auth/routes.ts]] — `POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/logout`
 - [[server/tests/health.test.ts]] — Server sanity test
-- [[server/tests/auth.test.ts]] — Identity: sign-in/sign-up, session restore, races
+- [[server/tests/auth.test.ts]] — Identity: sign-in/sign-up, cookie flags, session restore, logout, races
 - [[server/tests/json-file.test.ts]] — Storage: lost-update, atomicity, lock recovery
 - [[server/package.json]] — Server dependencies & build scripts
 - [[server/tsconfig.json]] — TypeScript compiler options for Node
