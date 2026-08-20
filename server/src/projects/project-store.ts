@@ -4,6 +4,8 @@ import { getDataDir } from '../config.js';
 import { readJson, updateJson, writeJsonAtomic } from '../storage/json-file.js';
 import type { Project } from './types.js';
 
+import { projectEvents } from './events.js';
+
 function projectFilePath(id: string): string {
   return path.join(getDataDir(), 'projects', `${id}.json`);
 }
@@ -18,6 +20,7 @@ export async function saveProject(project: Project): Promise<Project> {
   const file = projectFilePath(project.id);
   project.updatedAt = new Date().toISOString();
   await writeJsonAtomic(file, project);
+  projectEvents.emitProjectUpdate(project);
   return project;
 }
 
@@ -26,7 +29,7 @@ export async function mutateProject(
   mutate: (current: Project) => Project | Promise<Project>
 ): Promise<Project> {
   const file = projectFilePath(id);
-  return updateJson<Project>(file, null as unknown as Project, async (current) => {
+  const updated = await updateJson<Project>(file, null as unknown as Project, async (current) => {
     if (!current) {
       throw new Error(`Project ${id} not found`);
     }
@@ -34,6 +37,8 @@ export async function mutateProject(
     next.updatedAt = new Date().toISOString();
     return next;
   });
+  projectEvents.emitProjectUpdate(updated);
+  return updated;
 }
 
 export async function listUserProjects(userId: string): Promise<Project[]> {

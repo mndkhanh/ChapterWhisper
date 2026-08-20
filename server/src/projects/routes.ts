@@ -60,6 +60,8 @@ projectsRouter.post('/', async (req, res) => {
   res.status(201).json({ project: newProject });
 });
 
+import { projectEvents } from './events.js';
+
 projectsRouter.get('/:id', async (req, res) => {
   const user = (req as unknown as AuthedRequest).user;
   const project = await getProject(req.params.id);
@@ -68,6 +70,35 @@ projectsRouter.get('/:id', async (req, res) => {
     return;
   }
   res.json({ project });
+});
+
+projectsRouter.get('/:id/events', async (req, res) => {
+  const user = (req as unknown as AuthedRequest).user;
+  const project = await getProject(req.params.id);
+  if (!project || project.userId !== user.id) {
+    res.status(404).json({ error: 'Project not found' });
+    return;
+  }
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache, no-transform',
+    Connection: 'keep-alive',
+  });
+  res.write(`data: ${JSON.stringify({ type: 'connected', projectId: project.id, timestamp: new Date().toISOString() })}\n\n`);
+
+  const unsubscribe = projectEvents.subscribe(project.id, (event) => {
+    res.write(`data: ${JSON.stringify(event)}\n\n`);
+  });
+
+  const heartbeat = setInterval(() => {
+    res.write(': keepalive\n\n');
+  }, 25000);
+
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    unsubscribe();
+  });
 });
 
 projectsRouter.post('/:id/steps/:stepIndex/run', async (req, res) => {

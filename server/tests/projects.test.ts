@@ -234,5 +234,38 @@ describe('Projects & Pipeline API', () => {
     expect(step4Res.body.project.chapters[0].characters).toEqual(['Mole', 'Water Rat']);
     expect(step4Res.body.project.statuses[3]).toBe('done');
     expect(step4Res.body.project.statuses[4]).toBe('ready');
+
+    // ── Check Attempts / History ──
+    expect(step4Res.body.project.attempts).toBeDefined();
+    expect(step4Res.body.project.attempts.length).toBeGreaterThanOrEqual(4);
+    expect(step4Res.body.project.attempts[0].status).toBe('done');
+    expect(step4Res.body.project.attempts[0].durationMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it('connects to SSE endpoint and receives connection confirmation', async () => {
+    const created = await supertest(app)
+      .post('/api/projects')
+      .set('Cookie', authCookie)
+      .send({ title: 'SSE Test', bookText: 'Testing events stream...' });
+    const pId = created.body.project.id;
+
+    const res = await supertest(app)
+      .get(`/api/projects/${pId}/events`)
+      .set('Cookie', authCookie)
+      .buffer(true)
+      .parse((res, cb) => {
+        let data = '';
+        res.on('data', (chunk) => {
+          data += chunk.toString();
+          if (data.includes('connected')) {
+            res.destroy(); // Close stream after connection packet
+            cb(null, data);
+          }
+        });
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.header['content-type']).toContain('text/event-stream');
+    expect(res.body).toContain('connected');
   });
 });

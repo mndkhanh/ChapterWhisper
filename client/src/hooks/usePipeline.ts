@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { Project } from '../types.js';
 import * as api from '../api/projects.js';
 import { ApiError, StepFailedError } from '../api/projects.js';
@@ -14,8 +14,9 @@ const STEP_NAMES = ['Art Style', 'Characters', 'Character Portraits', 'Chapter S
  * of that wait; the authoritative `running` lives on the server, which is what
  * makes the duplicate guard work across tabs.
  *
- * Nothing here retries. A failed step stays failed until the user presses the
- * button again — the PRD forbids automatic retries.
+ * Real-time state synchronization is delivered over SSE (`/api/projects/:id/events`).
+ * Nothing here retries automatically. A failed step stays failed until the user
+ * presses the button again — the PRD forbids automatic retries.
  */
 export function usePipeline(
   activeProject: Project | undefined,
@@ -25,6 +26,58 @@ export function usePipeline(
   const [stepIndex, setStepIndex] = useState(0);
   const [customStyle, setCustomStyle] = useState('');
   const [busyStep, setBusyStep] = useState<number | null>(null);
+
+  // Real-time step and project updates via WebSocket
+  useEffect(() => {
+    if (!activeProject?.id || typeof WebSocket === 'undefined') return;
+
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws?projectId=${encodeURIComponent(activeProject.id)}`;
+    let socket: WebSocket | null = null;
+    let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+    let isDisposed = false;
+
+    function connect() {
+      if (isDisposed) return;
+      try {
+        socket = new WebSocket(wsUrl);
+
+        socket.onopen = () => {
+          socket?.send(JSON.stringify({ type: 'subscribe', projectId: activeProject!.id }));
+        };
+
+        socket.onmessage = (e) => {
+          try {
+            const payload = JSON.parse(e.data);
+            if (payload?.project && payload.project.id === activeProject!.id) {
+              applyProject(payload.project);
+            }
+          } catch {}
+        };
+
+        socket.onclose = () => {
+          if (!isDisposed) {
+            reconnectTimeout = setTimeout(connect, 3000);
+          }
+        };
+
+        socket.onerror = () => {
+          socket?.close();
+        };
+      } catch {}
+    }
+
+    connect();
+
+    return () => {
+      isDisposed = true;
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      if (socket) {
+        socket.onclose = null;
+        socket.close();
+      }
+    };
+  }, [activeProject?.id, applyProject]);
 
   // Step 0's style is chosen in the browser and only reaches the server when the
   // step actually runs, as the `{ style }` body. Until then it is a selection,
