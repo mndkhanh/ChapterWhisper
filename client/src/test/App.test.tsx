@@ -7,19 +7,32 @@ describe('App component', () => {
     localStorage.clear();
   });
 
-  it('renders login screen by default', () => {
+  it('renders login screen by default', async () => {
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/auth/me')) {
+        return Promise.resolve({ ok: false, status: 401 } as Response);
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response);
+    });
+
     render(<App />);
     expect(screen.getByText('CHAPTERWHISPER')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /enter the atelier/i })).toBeInTheDocument();
   });
 
   it('allows logging in and viewing the library', async () => {
-    global.fetch = vi.fn().mockImplementation(() =>
-      Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve({ user: { id: 'u1', name: 'Evelyn Thorne', email: 'evelyn@atelier.co' } }),
-      }) as unknown as Promise<Response>
-    );
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/auth/me')) {
+        return Promise.resolve({ ok: false, status: 401 } as Response);
+      }
+      if (url.includes('/api/auth/login')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ user: { id: 'u1', name: 'Evelyn Thorne', email: 'evelyn@atelier.co' } }),
+        } as Response);
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response);
+    });
 
     render(<App />);
     const nameInput = screen.getByPlaceholderText('Evelyn Thorne');

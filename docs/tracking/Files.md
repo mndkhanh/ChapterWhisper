@@ -52,6 +52,17 @@ Complete map of all tracked source code, configuration, scripts, and documentati
 - [[server/tsconfig.json]] — TypeScript compiler options for Node
 
 ## 🎨 Frontend Client (`client/`)
+- [[client/src/api/auth.ts]] — API client for authentication
+- [[client/src/hooks/useAuth.ts]] — Auth state management hook
+- [[client/src/hooks/useProjects.ts]] — Projects CRUD hook
+- [[client/src/hooks/usePipeline.ts]] — Pipeline orchestration hook
+- [[client/src/components/common/Toast.tsx]] — Global notification component
+- [[client/src/components/layout/Header.tsx]] — Main navigation & auth status
+- [[client/src/components/auth/LoginScreen.tsx]] — Authentication entry point
+- [[client/src/components/library/LibraryView.tsx]] — Project management dashboard
+- [[client/src/components/new-project/NewProjectView.tsx]] — Project creation wizard
+- [[client/src/components/pipeline/PipelineStudio.tsx]] — Gemini pipeline orchestration
+- [[client/src/components/result/ResultView.tsx]] — Generation output visualization
 - [[client/src/App.tsx]] — Main React application root component
 - [[client/src/main.tsx]] — React DOM client entry point
 - [[client/src/types.ts]] — TypeScript interfaces for User, Project, Characters, Chapters & StepStatus
