@@ -15,27 +15,26 @@ client's data layer is real `fetch` against that API — the `localStorage` mock
 `setTimeout` fake step runner are **gone**. What remains fake is narrower and specific; see
 "What is still mocked" below before touching the pipeline screens.
 
-`npm test` currently passes **23 server tests + 10 client tests**. Re-run it rather than trusting
+`npm test` currently passes **35 server tests + 32 client tests** (67 total). Re-run it rather than trusting
 any count written down here or in `Progress.md` — both rot.
 
 ## What is still mocked
 
-The data layer is done. Three presentational leftovers from the visual mock are not:
+The data layer is done, and steps 01–04 plus the result screen now render real server data.
+Two leftovers from the visual mock remain:
 
-- **`SAMPLE_CHAPTERS`** — a hardcoded list of three chapter titles. **Step 04 no longer uses
-  it**: `PipelineStudio` renders real `project.chapters` once `statuses[3] === 'done'`, behind a
-  "Formulate Chapter Scene" empty-state card. What survives is `PipelineStudio.tsx:330` (step
-  05's placeholder title) and the whole of `ResultView.tsx`, which still labels the finished
-  plate from the fake array. The server caps chapters at **one** (`.slice(0, 1)` in
-  `runStep4Chapters`), so any index past 0 cannot correspond to anything.
-- **`pendingChapterIndex` is local-only.** `usePipeline` holds the step-04 selection in React
-  state and never sends it — there is no endpoint that accepts it, and the server picks the
-  chapter itself in step 04. Clicking a different row changes nothing server-side. Either wire
-  a real selection or drop the affordance; do not leave it looking functional.
-- **`ResultView` never renders the illustration.** It draws a grey `bg-[#a7a49d]` box where the
-  finished plate belongs, even though `project.chapters[i].illustrationUrl` is populated and
-  `PipelineStudio` already renders it correctly as an `<img>`. This is the one place the final
-  deliverable image is missing from the UI.
+- **`SAMPLE_CHAPTERS`** — a hardcoded list of three chapter titles in `PipelineStudio.tsx`.
+  A single use survives, at line 330: step 05's placeholder title before the illustration
+  exists. Step 04 renders real `project.chapters` behind a "Formulate Chapter Scene" card, and
+  `ResultView` now renders the real chapter, cast, portraits, and finished plate. The server
+  caps chapters at **one** (`runStep4Chapters` stores a single-element array), so any index past 0 cannot
+  correspond to anything — which is precisely what that surviving lookup does.
+- **`pendingChapterIndex` is a selection with nothing left to select.** Step 04 takes **no user
+  input** by design — the model picks the scene, the server stores exactly one chapter, and
+  `chapterIndex` is always 0. `usePipeline` still carries `pendingChapterIndex` and
+  `selectChapter`, and any picker UI is now dead weight; all of it should go. Do not re-add a
+  chooser or a free-text box here: "the user chooses nothing in step 04" is a deliberate call
+  (the AI's generate-every-chapter-then-select design was overridden), not an oversight.
 
 `DEFAULT_STYLES` in `PipelineStudio.tsx` is **not** in this category — the server has no styles
 endpoint, and step 01 takes an optional `{ style }` override, so client-side presets are the
@@ -167,24 +166,27 @@ Two rules:
 - **`Progress.md` and `Files.md` rot first**, because they carry counts and paths. `Progress.md`
   names a passing-test count: re-run `npm test` and correct it rather than repeating it.
 
-Known drift right now, all worth fixing as you pass through:
+No known drift is outstanding right now. Re-derive it rather than trusting this line — the
+tracking notes rot fastest.
 
-- Root `.env.example` still names `gemini-2.5-flash` and `imagen-3.0-generate-002`; `config.ts`
-  defaults to `gemini-3.7-flash` and `gemini-3.1-flash-image`. A reviewer who copies
-  `.env.example` gets different models than one who sets nothing at all.
-
-Three items previously listed here are now fixed, and are recorded so nobody re-reports them:
+Four items previously listed here are fixed, recorded so nobody re-reports them:
 `Progress.md`'s false "18 passing" now reads 23 (33 across both workspaces) with the partially
 covered Milestone 5 boxes annotated rather than falsely ticked; `Architecture.md`'s dead
 `[[Pipeline Runner]]` and `[[Media]]` links now both point at `[[Projects]]`, which genuinely
-covers all three; and `Files.md` registers the client data layer.
+covers all three; `Files.md` registers the client data layer; and the env template — now at
+`server/.env.example`, moved out of the repo root along with its dead `.env` twin — names
+`gemini-3.7-flash` / `gemini-3.1-flash-image`, matching `config.ts` (it previously named
+`imagen-3.0-generate-002`, which cannot do the conversational chaining steps 03 and 05 need, so
+anyone who copied the file got a broken pipeline).
 
 Where the deliverables actually stand: `TESTING.md` is written and carries a real pasted run —
 **re-run and re-paste it**, since it predates the 33-test suite. `DECISIONS.md` now holds three
 real decisions in the user's own voice (cookie-vs-localStorage, preset art styles, no
 regeneration of a `done` step); it needs **1–3 more** to hit the 4–6 required, and still owes
 the stack + storage choice, the progress model, and the one-more-day close. `README.md` is
-**empty (0 bytes)** — the largest remaining gap in the graded deliverables.
+**written** (~140 lines): prerequisites, the `server/.env` setup trap, the single start and test
+commands, a five-minute review walkthrough, a requirement-to-code mapping table, and a stated
+known-gaps list.
 
 ## Architecture
 
@@ -297,11 +299,12 @@ the client renders them as plain `<img src>` with no extra fetch.
   user fails closed instead of authorizing a ghost. CSRF defence is `SameSite=Lax` alone — no
   CSRF token, deliberately (see `TESTING.md`). `useAuth`'s `localStorage['cw_user']` write is a
   display cache only — the cookie is the actual session.
-- **Env lives in three places now.** Root `.env`/`.env.example` and `server/.env` are the
-  server's (byte-identical copies); `dotenv.config()` in `server/src/index.ts` resolves against
-  the server's cwd, so `server/.env` is the one that actually loads under `npm run dev`.
-  `client/.env.example` is separate and documents the Vite-side vars. Keep the two server copies
-  in sync or collapse to one — silently divergent copies are a debugging trap.
+- **Env lives beside the code that reads it.** The server's template and live file are
+  `server/.env.example` and `server/.env`; `dotenv.config()` in `server/src/index.ts` resolves
+  against the server's cwd, so `server/.env` is the one that loads under `npm run dev`. The
+  root-level `.env`/`.env.example` duplicates were removed — they never loaded and drifted from
+  the copies that did. `client/.env.example` is separate and documents the Vite-side vars.
+  **Do not reintroduce a root `.env`.**
 - **Installed-but-unused deps encode the intended design**, not accidents: `multer`
   (`.txt` upload — the client currently reads files with `FileReader` and posts text instead),
   `uuid`, and on the client `clsx`, `tailwind-merge`, `lucide-react`. `zod` is in use for
@@ -385,9 +388,11 @@ Gemini REST docs: `https://ai.google.dev/gemini-api/docs`
 Graded, from `docs/spec/PRD.md`. Do not quietly relax them.
 
 - **Caps: max 2 characters (adults only) and max 1 chapter, enforced server-side.** Today that
-  is the `.slice(0, 2)` in `runStep2Characters` and `.slice(0, 1)` in `runStep4Chapters`, plus
-  "only the adults" in the prompt. They bound API cost. **Still untested** — the highest-value
-  test left to write.
+  is the `.slice(0, 2)` in `runStep2Characters`, and `runStep4Chapters` asking the model for a
+  single scene and storing one chapter, plus
+  "only the adults" in the prompt. They bound API cost, and both are covered by
+  `tests/pipeline.test.ts` (step 02 caps the cast; step 04 truncates an array answer to one
+  chapter) as well as the sequential test in `projects.test.ts`.
 - **Send the book text to Gemini once** and reuse it across steps. Never re-send the full text
   per step — that is what the `previous_interaction_id` chain is for.
 - **Never auto-retry a Gemini call.** All retries are user-triggered.
@@ -403,7 +408,7 @@ Graded, from `docs/spec/PRD.md`. Do not quietly relax them.
   path — no manual file surgery. A timeout that *clears* the lock so the user can press retry is
   sanctioned; a timeout that fires a fresh Gemini call on its own violates the no-auto-retry
   rule. Keep the distinction explicit in the code.
-- Gemini key via env var, never committed; ship `.env.example`. Images and book text on the
+- Gemini key via env var, never committed; ship `server/.env.example`. Images and book text on the
   local filesystem, served through our own API — no S3/CDN.
 - Out of scope, do not build: Veo animation, Lyria music, TTS narration, audiobook.
 
@@ -437,7 +442,7 @@ Graded, from `docs/spec/PRD.md`. Do not quietly relax them.
 - **Server tests set `process.env` and register `vi.mock`, then `await import('../src/app.js')`
   at top level.** Keep that shape in new server tests: a static import buries the ordering and
   leaves the suite one careless module-level `process.env` read away from breaking.
-- **Six committed files start with a UTF-8 BOM** — `.env.example`, `client/index.html`,
+- **Six committed files start with a UTF-8 BOM** — `server/.env.example`, `client/index.html`,
   `client/postcss.config.js`, `client/tailwind.config.js`, and both `tsconfig.json`s. An
   exact-match edit against the first line of one of those has to account for it, and a rewrite
   shouldn't strip it silently. (`Index.md`, `Pipeline.md`, and `Progress.md` had one and have
@@ -470,8 +475,9 @@ did exactly that and have since been rewritten against the API — don't reintro
   deliberately-not-tested list, and real pasted run output (colour codes stripped, nothing else
   altered). Its pasted run predates the current suite — re-run and re-paste rather than editing
   the numbers by hand.
-- **`README.md`** — still empty. Reviewer guide, prerequisites, the single start command, and
-  the single test command.
+- **`README.md`** — written. Reviewer guide, prerequisites, the single start command, and the
+  single test command, plus a requirements-to-code table and an honest known-gaps list. Keep the
+  test counts and the known-gaps list true as the code moves.
 - **Git history** — small, meaningful, incremental commits with real messages, committed as
   work happens. No single giant commit; reviewers look at timestamps. Note in the message body
   when a commit was mostly AI-authored — the PRD says honesty scores and hiding it doesn't.
@@ -486,7 +492,10 @@ did exactly that and have since been rewritten against the API — don't reintro
   from `updateJson` and watching it go red. A concurrency test that passes either way is
   decoration. `projects.test.ts` covers the auth guard, creation, the locked-step 400, the
   terminal-`done` 409, and retry-after-failure; the **409 duplicate-run guard while a step is
-  actually `running`** and the **caps** are still uncovered.
+  actually `running`** and the **caps** are covered by `tests/pipeline.test.ts`, which also
+  covers steps 01–05 individually, the media-streaming routes, retry-after-failure, ownership
+  isolation, and the send-the-book-once chain. The 409-while-running test was verified by
+  disabling the guard and watching it go red (200 instead of 409) — keep it falsifiable.
 - Mock Gemini in tests — do not burn free-tier quota, which is tighter on the image model.
 - Keep `docs/tracking/Progress.md` and `docs/tracking/Files.md` current as work lands. They are
   only useful if they can be trusted.

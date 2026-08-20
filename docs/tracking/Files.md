@@ -21,7 +21,6 @@ Complete map of all tracked source code, configuration, scripts, and documentati
 - [[TESTING.md]] — Frontend & Backend testing strategy + test output log (Graded deliverable)
 - [[README.md]] — Project overview, start/test instructions & architecture
 - [[package.json]] — Root workspace configuration & orchestration scripts
-- [[.env.example]] — Environment variables template
 - [[app-demo.html]] — Reference interactive prototype
 
 ## 📚 Documentation & Obsidian Vault (`docs/`)
@@ -55,7 +54,9 @@ Complete map of all tracked source code, configuration, scripts, and documentati
 - [[server/tests/auth.test.ts]] — Identity: sign-in/sign-up, cookie flags, session restore, logout, races
 - [[server/tests/json-file.test.ts]] — Storage: lost-update, atomicity, lock recovery
 - [[server/tests/projects.test.ts]] — Projects & Pipeline API: step validation, step 00 anchor, auth guard
+- [[server/tests/pipeline.test.ts]] — Per-step coverage 01–05 plus the graded guarantees: caps, retry, 409-while-running, media streaming, book-sent-once
 - [[server/package.json]] — Server dependencies & build scripts
+- [[server/.env.example]] — Server env template: `PORT`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `GEMINI_API_KEY`, model ids, `STORAGE_DIR`
 - [[server/tsconfig.json]] — TypeScript compiler options for Node
 
 ## 🎨 Frontend Client (`client/`)
@@ -77,9 +78,15 @@ Complete map of all tracked source code, configuration, scripts, and documentati
 - [[client/src/types.ts]] — TypeScript interfaces for User, Project, Characters, Chapters & StepStatus
 - [[client/src/index.css]] — Global stylesheet & design token classes
 - [[client/src/vite-env.d.ts]] — Vite client type declarations (`import.meta.env`)
-- [[client/src/test/health.test.ts]] — Client sanity test
-- [[client/src/test/App.test.tsx]] — Client App component test
+- [[client/src/test/health.test.ts]] — Client environment sanity & ApiError test
+- [[client/src/test/useAuth.test.ts]] — Auth hook unit test: session hydration, login, logout & localStorage sync
+- [[client/src/test/useProjects.test.ts]] — Projects hook unit test: listing, creation, validation & project loading
 - [[client/src/test/usePipeline.test.ts]] — Pipeline hook: style post, 200-with-failed trap, 409 resync, locked/done guards
+- [[client/src/test/LoginScreen.test.tsx]] — LoginScreen component unit test: input handlers & validation
+- [[client/src/test/LibraryView.test.tsx]] — LibraryView component unit test: project progress cards & actions
+- [[client/src/test/NewProjectView.test.tsx]] — NewProjectView component unit test: form inputs & ingestion state
+- [[client/src/test/ResultView.test.tsx]] — ResultView component unit test: first edition plate & cast rendering
+- [[client/src/test/App.test.tsx]] — Client App component test
 - [[client/src/test/setup.ts]] — Client test setup with `@testing-library/jest-dom`
 - [[client/index.html]] — HTML page container
 - [[client/vite.config.ts]] — Vite bundler & API proxy configuration

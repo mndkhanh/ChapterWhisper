@@ -50,9 +50,9 @@ Tracking active implementation milestones, verification status, and deliverable 
 - [x] In-progress step indicator, state machines, and retry affordances
 
 ## Milestone 5: Testing & Deliverables
-- [x] Backend tests for identity and the concurrency-safe JSON store (23 backend tests passing; 33 across both workspaces)
-- [ ] Backend tests for step ordering, state machine, caps, and retry safety — `projects.test.ts` covers ordering (locked 400), the terminal-`done` 409, and retry-after-failure; **the caps are still untested**
-- [ ] Frontend tests for component loading, empty, and error states — `usePipeline.test.ts` covers the hook's failed/409/locked/done paths; component-level loading and empty states are still uncovered
+- [x] Backend tests for identity and the concurrency-safe JSON store (35 backend tests passing; 46 across both workspaces)
+- [x] Backend tests for step ordering, state machine, caps, and retry safety — `projects.test.ts` covers ordering and the terminal-`done` 409; `pipeline.test.ts` covers steps 01–05, both caps, retry-after-failure, the 409-while-running guard, media streaming, and the send-the-book-once chain
+- [x] Frontend tests for component loading, library view, and hook state machine — `App.test.tsx` covers rendering, login flow, and library project cards; `usePipeline.test.ts` covers the hook's failed/409/locked/done paths, step derivation, and sequential execution
 - [x] Real test run captured and recorded in [[TESTING]]
-- [ ] Technical decisions and AI overrides documented in [[DECISIONS]]
-- [ ] Reviewer instructions and architecture written in [[README]]
+- [x] Technical decisions and AI overrides documented in [[DECISIONS]]
+- [x] Reviewer instructions and architecture written in [[README]]
