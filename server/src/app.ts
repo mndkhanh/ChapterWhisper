@@ -2,6 +2,7 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
 import { authRouter } from './auth/routes.js';
+import { projectsRouter } from './projects/routes.js';
 
 /**
  * The app is built here and listened to in `index.ts`, so tests can drive it
@@ -24,6 +25,8 @@ export function createApp() {
   });
 
   app.use('/api/auth', authRouter);
+  app.use('/api/projects', projectsRouter);
 
   return app;
 }
+
