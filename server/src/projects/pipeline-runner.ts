@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import {
@@ -14,7 +15,7 @@ import {
   parseJsonOutput,
 } from "../gemini/client.js";
 import { mutateProject } from "./project-store.js";
-import type { Project } from "./types.js";
+import type { Project, StepAttempt } from "./types.js";
 
 const SYSTEM_INSTRUCTIONS = `There must be no text on the image, it should not look like a cover page.
 It should be a full illustration with no borders, titles, nor description.
@@ -42,6 +43,7 @@ export async function executeStep(
 ): Promise<Project> {
   const currentStatus = project.statuses[stepIndex];
   const now = Date.now();
+  const startedAtIso = new Date(now).toISOString();
 
   // A completed step is final. Re-running one would spend a Gemini call to
   // overwrite a good result, and for step 01 it silently did nothing at all
@@ -95,12 +97,39 @@ export async function executeStep(
       default:
         throw new Error(`Invalid step index: ${stepIndex}`);
     }
-    return updated;
+
+    const finishMs = Date.now();
+    const attempt: StepAttempt = {
+      id: randomUUID(),
+      stepIndex,
+      startedAt: startedAtIso,
+      finishedAt: new Date(finishMs).toISOString(),
+      durationMs: finishMs - now,
+      status: "done",
+      error: null,
+    };
+
+    return await mutateProject(project.id, (p) => {
+      p.attempts = [...(p.attempts || []), attempt];
+      return p;
+    });
   } catch (err: any) {
+    const finishMs = Date.now();
+    const attempt: StepAttempt = {
+      id: randomUUID(),
+      stepIndex,
+      startedAt: startedAtIso,
+      finishedAt: new Date(finishMs).toISOString(),
+      durationMs: finishMs - now,
+      status: "failed",
+      error: err.message || "Step execution failed",
+    };
+
     return await mutateProject(project.id, (p) => {
       p.statuses[stepIndex] = "failed";
       p.stepStartedAt = null;
       p.error = err.message || "Step execution failed";
+      p.attempts = [...(p.attempts || []), attempt];
       return p;
     });
   }
@@ -158,7 +187,7 @@ async function runStep2Characters(project: Project): Promise<Project> {
   const interaction = await createInteraction({
     model: getTextModel(),
     input:
-      "Can you describe the main characters (only the adults) and prepare a prompt describing them with as much details as possible (use the descriptions from the book) so Nano Banana can generate images of them? Each prompt should be at least 50 words.",
+      "Can you describe the main characters (only the adults) and prepare a prompt describing them with as much details as possible (use the descriptions from the book) so Nano Banana can generate images of them? Each prompt should be at least 50 words, detailing exact facial features, hair, eye color, age, silhouette, signature clothing, materials, colors, and physical build.",
     previous_interaction_id: project.interactions.styleId,
     response_format: schema,
   });
@@ -199,7 +228,7 @@ async function runStep3Portraits(project: Project): Promise<Project> {
 
   for (let i = 0; i < updatedChars.length; i++) {
     const char = updatedChars[i];
-    const promptText = `Create an illustration for ${char.name} following this description: ${char.prompt}. The style we want you to follow is: ${project.style || ""}`;
+    const promptText = `Create an illustration portrait of character "${char.name}" in the art style "${project.style || ""}". Character visual details: ${char.prompt}. Clear individual portrait, character centered, showing exact face, hair, and clothing.`;
     const interaction = await createInteraction({
       model: getImageModel(),
       input: promptText,
@@ -224,10 +253,6 @@ async function runStep3Portraits(project: Project): Promise<Project> {
 }
 
 async function runStep4Chapters(project: Project): Promise<Project> {
-  // The cap is one chapter, so ask the model for one scene. Requesting a prompt
-  // for every chapter and discarding all but the first spent output tokens on
-  // work that was thrown away, and it is the only reason picking a chapter ever
-  // looked necessary. The model chooses the scene; the user chooses nothing.
   const schema = jsonSchemaFormat({
     type: "object",
     properties: {
@@ -238,10 +263,20 @@ async function runStep4Chapters(project: Project): Promise<Project> {
     required: ["name", "prompt"],
   });
 
+  const charDetails = project.characters
+    .map((c) => `Character "${c.name}": ${c.prompt}`)
+    .join("\n");
+
+  const promptInput = `Pick the single most illustratable scene in the book and provide one detailed prompt to illustrate it. It should be a single standalone image plate, not a multi-tiled page.
+
+The main characters in this story and their exact established visual designs are:
+${charDetails}
+
+Write a descriptive scene prompt for this chapter. If any of the characters above appear in the scene, explicitly refer to them by name and weave their exact visual features (attire, physical traits, colors) into the scene prompt so the image generator maintains strict visual consistency. Also list the names of all characters who appear in the scene.`;
+
   const interaction = await createInteraction({
     model: getTextModel(),
-    input:
-      "Pick the single most illustratable scene in the book and give me one prompt to illustrate it. It should be a single image, not a multi-tiled page. Be very descriptive, especially of the characters: tell their name and reuse the character prompts if they appear in the image. Also list all characters who appear in it.",
+    input: promptInput,
     previous_interaction_id:
       project.interactions.charactersId ||
       project.interactions.styleId ||
@@ -251,7 +286,6 @@ async function runStep4Chapters(project: Project): Promise<Project> {
 
   type ChapterOut = { name: string; prompt: string; characters?: string[] };
   const parsed = parseJsonOutput(interaction) as ChapterOut | ChapterOut[];
-  // Tolerate a model that answers with an array regardless; the cap still holds.
   const ch = Array.isArray(parsed) ? parsed[0] : parsed;
   if (!ch?.prompt) throw new Error("Gemini did not return a chapter scene");
 
@@ -269,7 +303,6 @@ async function runStep4Chapters(project: Project): Promise<Project> {
 }
 
 async function runStep5Illustration(project: Project): Promise<Project> {
-  // Exactly one chapter exists by construction — step 04 stores one.
   const ch = project.chapters[0];
   if (!ch) throw new Error("No chapter defined to illustrate");
 
@@ -281,7 +314,23 @@ async function runStep5Illustration(project: Project): Promise<Project> {
   );
   await fs.mkdir(storageDir, { recursive: true });
 
-  const promptText = `Create an illustration for ${ch.name} using the previously generated characters following this description: ${ch.prompt}`;
+  const charDescriptions = project.characters
+    .map((c) => `- Character "${c.name}": ${c.prompt}`)
+    .join("\n");
+
+  const promptText = `Create a masterwork illustration for the scene "${ch.name}".
+
+Art Style:
+${project.style || "Consistent Fine Art Illustration Style"}
+
+Scene Composition & Narrative Action:
+${ch.prompt}
+
+Character Visual Consistency Guidelines:
+${charDescriptions}
+
+Ensure all characters appearing in the scene strictly match their established visual descriptions, physical appearances, hair, clothing styles, and color palettes specified above. No text, no captions, no split panels.`;
+
   const interaction = await createInteraction({
     model: getImageModel(),
     input: promptText,
@@ -294,8 +343,6 @@ async function runStep5Illustration(project: Project): Promise<Project> {
   await fs.writeFile(filePath, buffer);
 
   return await mutateProject(project.id, (p) => {
-    // Merge inside the mutator rather than writing back an array that was read
-    // before the call, so a concurrent write to chapters is not lost.
     const target = p.chapters[0];
     if (target)
       target.illustrationUrl = `/api/projects/${project.id}/illustrations/${ch.id}`;

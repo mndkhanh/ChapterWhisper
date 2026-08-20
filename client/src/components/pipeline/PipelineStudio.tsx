@@ -339,6 +339,49 @@ export const PipelineStudio: React.FC<PipelineStudioProps> = ({
           </div>
         )}
 
+        {/* Attempt & Retry History for this step */}
+        {((project.attempts || []).filter((a) => a.stepIndex === stepIndex).length > 0) && (
+          <div className="mt-8 border border-[#b6ab9c]/60 bg-[#bfb4a3]/10 p-5 rounded-[2px]">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#615b53] flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#d49653]" />
+                Attempt & Execution History ({project.attempts!.filter((a) => a.stepIndex === stepIndex).length})
+              </div>
+            </div>
+            <div className="divide-y divide-[#b6ab9c]/30">
+              {project.attempts!.filter((a) => a.stepIndex === stepIndex).map((att, i) => (
+                <div key={att.id || i} className="py-2.5 flex items-center justify-between text-xs gap-4 flex-wrap">
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono text-[11px] font-semibold text-[#2c2c2c]">
+                      #{i + 1}
+                    </span>
+                    <span
+                      className={`px-2 py-0.5 text-[10px] font-semibold uppercase rounded-[2px] ${
+                        att.status === 'done'
+                          ? 'bg-[#d49653]/15 text-[#d49653]'
+                          : 'bg-[#a3402c]/15 text-[#a3402c]'
+                      }`}
+                    >
+                      {att.status === 'done' ? '✓ Succeeded' : '✕ Failed'}
+                    </span>
+                    <span className="text-[#615b53] font-mono text-[11px]">
+                      {(att.durationMs / 1000).toFixed(1)}s
+                    </span>
+                  </div>
+                  <div className="text-[#978e81] font-mono text-[11px]">
+                    {new Date(att.startedAt).toLocaleTimeString()}
+                  </div>
+                  {att.error && (
+                    <div className="w-full text-[11px] text-[#a3402c] font-mono bg-[#a3402c]/5 p-2 rounded-[2px] mt-1 break-words">
+                      {att.error}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Actions & Feedback Footer */}
         <div className="flex items-center gap-4 mt-10 flex-wrap">
           <button

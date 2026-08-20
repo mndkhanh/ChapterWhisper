@@ -16,6 +16,16 @@ export interface Chapter {
   illustrationUrl?: string;
 }
 
+export interface StepAttempt {
+  id: string;
+  stepIndex: number;
+  startedAt: string;
+  finishedAt: string;
+  durationMs: number;
+  status: 'done' | 'failed';
+  error?: string | null;
+}
+
 export interface Project {
   id: string;
   userId: string;
@@ -35,6 +45,7 @@ export interface Project {
     chaptersId?: string;
     illustrationId?: string;
   };
+  attempts?: StepAttempt[];
   error?: string | null;
   stepStartedAt?: number | null;
   createdAt: string;
