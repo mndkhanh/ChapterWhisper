@@ -12,7 +12,8 @@ interface LibraryViewProps {
 }
 
 export const LibraryView: React.FC<LibraryViewProps> = ({
-  user,
+  // `user` stays on the props interface — App and the tests both pass it — but
+  // nothing reads it since the STUDIO ARCHIVE line was removed.
   projects,
   loading = false,
   onOpenProject,
