@@ -1,4 +1,24 @@
 ---
+title: Take-Home Assessment Brief
+aliases:
+  - PRD
+  - Assessment Brief
+tags:
+  - chapterwhisper
+  - spec
+  - source-of-truth
+type: brief
+status: active
+source: Gradion - Intern Fullstack Developer take-home
+effort: ~16 hours of focused work
+deadline: 3 calendar days from receipt
+delivery: One Git repository link (GitHub / GitLab / Bitbucket)
+reference-notebook: https://colab.research.google.com/github/google-gemini/cookbook/blob/main/examples/Book_illustration.ipynb
+gemini-docs: https://ai.google.dev/gemini-api/docs
+---
+
+> [!info] Source of truth
+> This is the assessment brief, reproduced verbatim. Do not edit the requirements here - record your own reasoning in [[DECISIONS]] instead. Start from [[Index]].
 
 ## 01 · What You're Building
 
@@ -28,6 +48,7 @@ No separate worklog. `DECISIONS.md` holds **decisions only** — not a time log,
 
 A heading per decision, then a short paragraph in your own words: who proposed it, who pushed back, where you landed, and what it cost you. No template to fill in.
 
+> [!example] Two sample entries
 > ## Separate `status` and `step_state`
 >
 > Claude proposed a single `status` enum. I pushed back — one enum can't express "step 3 done, step 4 currently running", which is exactly the state a refresh mid-step has to read correctly. Split it in two. Cost: two fields to keep in sync, and a stranded `step_state` needs a timeout to clear.
@@ -65,10 +86,12 @@ Your commits are the story of how you worked.
 
 Your pipeline **must follow** the section **"Illustrate a book: The Wind in the Willows"** (steps 1–5 only) in Google's notebook:
 
+> [!important] Reference notebook - steps 1-5 only
 > https://colab.research.google.com/github/google-gemini/cookbook/blob/main/examples/Book_illustration.ipynb
 
 **Run it yourself in Colab before writing any app code.** The table below is the contract — the steps and the caps. The _mechanics_ are not in this document: which model, which call, how context is chained between steps, how structured output is requested. Get those from the notebook, not from guesswork.
 
+> [!tip]
 > **Hint:** you don't need Python, and you don't need a Google SDK. Every call the notebook makes is a plain HTTP endpoint you can hit from any language — file upload, structured JSON output, conversation chaining, image generation. Read the notebook for the _pipeline_, then map each call to the REST docs.
 > https://ai.google.dev/gemini-api/docs
 >
@@ -84,7 +107,7 @@ Your pipeline **must follow** the section **"Illustrate a book: The Wind in the 
 
 The **2 characters / 1 chapter caps are hard requirements** — they bound API cost per submission. **Enforce them server-side**, not just in the UI.
 
-**Out of scope — do not implement:** the notebook's later sections (Veo animation, Lyria music, TTS narration, media mixing, audiobook). See §08 if you finish early.
+**Out of scope — do not implement:** the notebook's later sections (Veo animation, Lyria music, TTS narration, media mixing, audiobook). See [[#08 · Bonus|§08]] if you finish early.
 
 ---
 
@@ -138,6 +161,7 @@ Required screens and states:
 
 ## 05 · Technical Requirements
 
+> [!warning]
 > **Keep it simple and lean. Do not over-engineer.**
 > Choosing the right-sized solution is part of what we're assessing. AI will hand you more structure than this needs — decide what to keep.
 
@@ -153,7 +177,7 @@ Either way, `DECISIONS.md` must record your reasoning, the upsides, the cons you
 
 Images and book text live on the local filesystem, served through your own API. No S3, no blob storage, no CDN.
 
-Whatever you pick must still satisfy the resume and no-duplicate-call rules in §4.3.
+Whatever you pick must still satisfy the resume and no-duplicate-call rules in [[#4.3 Pipeline behavior|§4.3]].
 
 ### 5.3 Gemini API
 
@@ -161,7 +185,7 @@ Whatever you pick must still satisfy the resume and no-duplicate-call rules in �
 - Real calls to a current Gemini text model and a current Gemini image model (Nano Banana family). Model IDs change — pick current ones, note your choice in `DECISIONS.md`.
 - REST or an official SDK, whichever suits your stack — see the API docs above.
 - Check the free-tier limits for the **image** model before you start; they are tighter than text. https://ai.google.dev/gemini-api/docs/rate-limits
-- No rate-limiting infrastructure required anywhere. The cost rules in §4.3 are what apply.
+- No rate-limiting infrastructure required anywhere. The cost rules in [[#4.3 Pipeline behavior|§4.3]] are what apply.
 
 ### 5.4 Testing
 
@@ -174,7 +198,7 @@ Tests on **both sides** are required.
 
 _Nice to have:_ an integration test covering a happy-path run through all 5 steps (mock Gemini — don't burn quota).
 
-Writing tests first is a good way to keep the AI honest (§09) — but we're grading the tests you ended up with, not your code coverage. E2E is not expected.
+Writing tests first is a good way to keep the AI honest ([[#09 · Suggested Way of Working|§09]]) — but we're grading the tests you ended up with, not your code coverage. E2E is not expected.
 
 ### 5.5 Local development
 
@@ -231,11 +255,11 @@ Not expected. Absence will not hurt you. Here if you finish early and want to sh
 
 Not a constraint. This is how we work with AI, and how you work is part of what we're assessing — so we name the practices, not the recipe. Look up what you don't know.
 
-1. **Explore first, by yourself.** Run the notebook — §03 requires this. Understand the pipeline by doing it, before AI writes anything.
+1. **Explore first, by yourself.** Run the notebook — [[#03 · The Reference Pipeline|§03]] requires this. Understand the pipeline by doing it, before AI writes anything.
 2. **Spec-driven development.** Your spec is the source of truth. Write it, brainstorm it with AI until the holes are filled, then build against it.
 3. **Set up your harness before you build.** Whatever gives you and the AI fast, automatic feedback that something broke.
 4. **Monitor and improve that harness as you go.** A harness that got better mid-project says more than a perfect one committed on day one.
-5. **Let AI implement; let the harness control quality.** Make it write the test first, then the code — TDD here is a leash on the AI, not a coverage target (§5.4). Tests and your own UAT are what tell you it's right, not reading every diff.
+5. **Let AI implement; let the harness control quality.** Make it write the test first, then the code — TDD here is a leash on the AI, not a coverage target ([[#5.4 Testing|§5.4]]). Tests and your own UAT are what tell you it's right, not reading every diff.
 6. **Review per task or at checkpoints — your call.** Either way you run it and see it yourself before it piles up.
 7. **You own the final quality pass.** Test the ugly paths yourself. Polish until it's yours.
 
@@ -244,3 +268,14 @@ Not a constraint. This is how we work with AI, and how you work is part of what 
 ---
 
 _GRADION · Scaling Business_
+
+---
+
+## Related notes
+
+- [[Index]] - vault hub and deliverable checklist
+- [[DESIGN]] - visual style reference
+- [[DECISIONS]] - required deliverable (§2.1, §2.3)
+- [[TESTING]] - required deliverable (§5.4)
+- [[CLAUDE]] - working agreement for Claude Code
+- [[app-demo.html]] - the reference mock (§4.4)

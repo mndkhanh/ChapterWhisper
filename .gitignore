@@ -1,0 +1,28 @@
+# Obsidian — share the vault config, not per-machine UI state
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/cache
+.trash/
+
+# Secrets — the Gemini key never gets committed (PRD §5.3)
+.env
+.env.*
+!.env.example
+
+# Node dependencies and build output
+node_modules/
+dist/
+build/
+.turbo/
+
+# Local data uploads / generated cache (keep directory structure if needed)
+server/data/storage/
+server/data/projects/
+server/data/users.json
+data/storage/
+data/projects/
+data/users.json
+
+# Test and coverage artifacts
+coverage/
+.nyc_output/
