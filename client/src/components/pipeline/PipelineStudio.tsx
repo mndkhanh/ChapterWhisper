@@ -14,12 +14,6 @@ const DEFAULT_STYLES = [
   { id: 'oil', name: 'Golden-Age Oil', desc: 'Warm varnished oil in the Rackham tradition — deep shadow, amber highlight, painterly grain.' },
 ];
 
-const SAMPLE_CHAPTERS = [
-  'I. The Letter Beneath the Door',
-  'II. The Midnight Market',
-  'III. The Duel in the Rafters',
-];
-
 interface PipelineStudioProps {
   project: Project;
   stepIndex: number;
@@ -71,9 +65,6 @@ export const PipelineStudio: React.FC<PipelineStudioProps> = ({
     <main className="max-w-7xl mx-auto px-8 py-10 grid grid-cols-1 md:grid-cols-[270px_1fr] gap-14 items-start">
       {/* Vertical Stepper Rail */}
       <div className="sticky top-24">
-        <div className="text-xs tracking-widest text-[#978e81] font-medium uppercase mb-1">
-          {project.style || 'STYLE PENDING'}
-        </div>
         <h2 className="font-serif font-light uppercase text-2xl tracking-tight mb-6">{project.title}</h2>
 
         <div className="flex flex-col">
@@ -313,11 +304,6 @@ export const PipelineStudio: React.FC<PipelineStudioProps> = ({
         {stepIndex === 4 && (
           <div className="border border-[#b6ab9c] bg-[#d8cbb8] p-8 shadow-sm">
             <div className="aspect-[16/10] plate-canvas border border-[#b6ab9c] flex flex-col justify-between p-8 relative overflow-hidden">
-              <div className="flex items-center justify-between z-10">
-                <span className="text-[11px] tracking-[0.2em] font-semibold text-[#292622]/60 uppercase">MASTER COMPOSITION PLATE</span>
-                <span className="text-[11px] tracking-widest font-mono text-[#292622]/60">{project.style || 'Ink & Wash'}</span>
-              </div>
-
               {project.chapters[project.chapterIndex ?? 0]?.illustrationUrl && project.statuses[4] === 'done' ? (
                 <img
                   src={project.chapters[project.chapterIndex ?? 0].illustrationUrl}
@@ -327,7 +313,7 @@ export const PipelineStudio: React.FC<PipelineStudioProps> = ({
               ) : (
                 <div className="my-auto text-center z-10">
                   <div className="font-serif text-4xl text-[#292622]/70 mb-2">
-                    {SAMPLE_CHAPTERS[project.chapterIndex ?? 0]}
+                    {project.chapters[0]?.name || 'Illustrated Chapter Scene'}
                   </div>
                   <div className="text-xs tracking-widest uppercase text-[#292622]/60 font-medium">
                     {project.statuses[4] === 'running' ? 'Composing multi-character plate with Gemini 3.1 Flash Image…' : 'Awaiting Final Composition'}
@@ -338,19 +324,6 @@ export const PipelineStudio: React.FC<PipelineStudioProps> = ({
               {project.statuses[4] === 'running' && (
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#d49653]/15 to-transparent animate-pulse" />
               )}
-
-              <div className="z-10 bg-[#d8cbb8]/90 backdrop-blur-sm -mx-8 -mb-8 p-5 border-t border-[#b6ab9c] flex items-center justify-between">
-                <div>
-                  <div className="text-[10px] tracking-widest font-semibold uppercase text-[#978e81]">FEATURING CAST</div>
-                  <div className="font-serif text-xl text-[#2c2c2c]">
-                    {project.characters.map((c) => c.name).join(' & ') || 'Principal Cast'}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-[10px] tracking-widest font-semibold uppercase text-[#978e81]">ATMOSPHERE</div>
-                  <div className="text-xs font-semibold uppercase text-[#d49653]">{project.style || 'Ink & Wash'}</div>
-                </div>
-              </div>
             </div>
           </div>
         )}

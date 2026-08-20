@@ -43,8 +43,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             className="border border-[#b6ab9c] p-8 flex flex-col justify-between min-h-[290px] bg-[#d8cbb8] hover:bg-[#bfb4a3]/30 hover:border-[#2c2c2c] hover:shadow-md transition-all cursor-pointer group"
           >
             <div>
-              <div className="flex items-center justify-between text-[11px] font-semibold tracking-[0.18em] mb-6">
-                <span className="text-[#978e81] uppercase">{p.style || 'STYLE PENDING'}</span>
+              <div className="flex items-center justify-end text-[11px] font-semibold tracking-[0.18em] mb-6">
                 <span className={`px-2 py-0.5 text-[10px] rounded-[2px] ${
                   doneCount === 5
                     ? 'bg-[#d49653]/15 text-[#d49653]'
