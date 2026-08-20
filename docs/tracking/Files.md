@@ -34,8 +34,17 @@ Complete map of all tracked source code, configuration, scripts, and documentati
 - [[Files.md|docs/tracking/Files.md]] — This file registry
 
 ## ⚙️ Backend Server (`server/`)
-- [[server/src/index.ts]] — Express server entry point & HTTP router
+- [[server/src/index.ts]] — Server entry point: loads env, starts listening
+- [[server/src/app.ts]] — Express app factory & route mounting (importable by tests)
+- [[server/src/config.ts]] — Lazy env accessors (`STORAGE_DIR`, `JWT_SECRET`, `JWT_EXPIRES_IN`)
+- [[server/src/storage/json-file.ts]] — JSON store: per-file mutex + atomic write-rename
+- [[server/src/users/user-store.ts]] — `User` model & find-or-create by email
+- [[server/src/auth/jwt.ts]] — Token signing & verification
+- [[server/src/auth/middleware.ts]] — `requireAuth` bearer-token guard
+- [[server/src/auth/routes.ts]] — `POST /api/auth/login`, `GET /api/auth/me`
 - [[server/tests/health.test.ts]] — Server sanity test
+- [[server/tests/auth.test.ts]] — Identity: sign-in/sign-up, session restore, races
+- [[server/tests/json-file.test.ts]] — Storage: lost-update, atomicity, lock recovery
 - [[server/package.json]] — Server dependencies & build scripts
 - [[server/tsconfig.json]] — TypeScript compiler options for Node
 

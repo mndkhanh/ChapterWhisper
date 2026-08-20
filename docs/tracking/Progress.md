@@ -22,8 +22,8 @@ Tracking active implementation milestones, verification status, and deliverable 
 - [x] Environment configuration (`.env.example`)
 
 ## Milestone 2: Backend Architecture & Storage
-- [ ] User authentication (passwordless JWT with email + name)
-- [ ] Local JSON file storage engine with per-project mutex locks
+- [x] User authentication (passwordless JWT with email + name) — `POST /api/auth/login`, `GET /api/auth/me`
+- [x] Local JSON file storage engine with per-file mutex locks and atomic write-rename
 - [ ] Media & file streaming storage for raw text, portraits, and illustrations
 - [ ] Server-side validation for step transitions and project ownership
 
@@ -49,8 +49,9 @@ Tracking active implementation milestones, verification status, and deliverable 
 - [ ] In-progress step indicator and error retry affordance
 
 ## Milestone 5: Testing & Deliverables
+- [x] Backend tests for identity and the concurrency-safe JSON store (13 passing)
 - [ ] Backend tests for step ordering, state machine, caps, and retry safety
 - [ ] Frontend tests for component loading, empty, and error states
-- [ ] Real test run captured and recorded in [[TESTING]]
+- [x] Real test run captured and recorded in [[TESTING]]
 - [ ] Technical decisions and AI overrides documented in [[DECISIONS]]
 - [ ] Reviewer instructions and architecture written in [[README]]

@@ -8,10 +8,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 upload a book's text, then run a 5-step Gemini pipeline one step at a time —
 style → characters → portraits → chapters → illustrations.
 
-**Current state: harness only.** npm workspaces + Express/TS server + Vite/React/TS client,
-joined by a health-check endpoint and one sanity test per side. `server/src/index.ts` is still
-the entire backend. None of the pipeline, auth, storage, or Gemini integration is written.
-The design for all of it, however, is now specified in `docs/` — see below.
+**Current state: identity and storage done, pipeline not started.** npm workspaces +
+Express/TS server + Vite/React/TS client. The server has passwordless auth
+(`POST /api/auth/login`, `GET /api/auth/me`) over a JSON-file store with per-file mutex locks
+and atomic write-rename. No projects, no Gemini integration, and no UI beyond the health-check
+page. The design for the rest is specified in `docs/` — see below.
 
 ## Work through the vault, every task
 
@@ -123,16 +124,17 @@ client/  Vite 6 + React 18 + TS + Tailwind 3
 
 ### Traps in the current scaffold
 
-- **Neither side has a vitest config file.** Client tests therefore run in the default `node`
-  environment — the first React component test will fail on a missing DOM. Add
-  `client/vitest.config.ts` with `environment: 'jsdom'` and a `@testing-library/jest-dom`
-  setup file before writing component tests. (`jsdom` and Testing Library are already installed.)
 - **`server/tsconfig.json` includes only `src/`,** but tests live in `server/tests/`. They run
   under vitest but are never type-checked by `npm run build`.
-- **Tailwind is configured but not wired in.** `client/src/index.css` has no `@tailwind`
-  directives, so the utility classes already on `client/index.html`'s `<body>`
-  (`bg-parchment`, `text-onyx-warm`, `selection:bg-saffron-glow`) currently do nothing, and
-  the file hardcodes an off-palette `#f8f6f0`. Add the three directives when styling starts.
+- **The server has no vitest config**, so it runs in the default `node` environment — correct
+  for supertest, but any future DOM-ish server test needs its own config. The client has
+  `client/vitest.config.ts` (jsdom + `src/test/setup.ts`).
+- **Imports inside `server/src` must carry the `.js` extension** (`'./app.js'`), because the
+  server is ESM with `moduleResolution: NodeNext`. Extensionless imports pass under `tsx` in dev
+  and then break `node dist/index.js` in production.
+- **Env accessors in `config.ts` read `process.env` lazily on every call**, so `dotenv.config()`
+  at startup and per-test `STORAGE_DIR` overrides both work. Don't hoist them into module-level
+  constants — tests set the env before importing the app.
 
 ## Hard requirements that constrain implementation
 
