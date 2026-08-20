@@ -1,32 +1,26 @@
 import type { User } from '../types.js';
+import { ApiError, request } from './http.js';
 
 export async function fetchCurrentUser(): Promise<User | null> {
-  const res = await fetch('/api/auth/me', {
-    credentials: 'include',
-  });
-  if (!res.ok) return null;
-  const data = await res.json();
-  return data.user;
+  try {
+    const { user } = await request<{ user: User }>('GET', '/api/auth/me');
+    return user;
+  } catch (err) {
+    // 401 is the normal "not signed in" answer, not a failure worth surfacing.
+    if (err instanceof ApiError && err.status === 401) return null;
+    throw err;
+  }
 }
 
 export async function loginUser(name: string, email: string): Promise<User> {
-  const res = await fetch('/api/auth/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ name, email }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => null);
-    throw new Error(err?.error || 'Failed to sign in');
-  }
-  const data = await res.json();
-  return data.user;
+  const { user } = await request<{ user: User }>('POST', '/api/auth/login', { name, email });
+  return user;
 }
 
+/**
+ * Must be a server call: the session cookie is httpOnly, so the client
+ * physically cannot clear it on its own.
+ */
 export async function logoutUser(): Promise<void> {
-  await fetch('/api/auth/logout', {
-    method: 'POST',
-    credentials: 'include',
-  }).catch(() => {});
+  await request<void>('POST', '/api/auth/logout').catch(() => {});
 }

@@ -12,6 +12,8 @@ interface NewProjectViewProps {
   title: string;
   text: string;
   uploadHint: string;
+  /** True while step 00 is in flight — the manuscript is being sent to Gemini. */
+  creating?: boolean;
   onTitleChange: (val: string) => void;
   onTextChange: (val: string) => void;
   onFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -22,6 +24,7 @@ export const NewProjectView: React.FC<NewProjectViewProps> = ({
   title,
   text,
   uploadHint,
+  creating = false,
   onTitleChange,
   onTextChange,
   onFileUpload,
@@ -66,12 +69,29 @@ export const NewProjectView: React.FC<NewProjectViewProps> = ({
           <div className="text-xs text-[#978e81]">{uploadHint}</div>
         </label>
 
-        <button
-          onClick={onCreate}
-          className="mt-8 bg-[#2c2c2c] hover:bg-[#292622] text-[#d8cbb8] rounded-[3px] px-8 py-4 text-xs font-semibold tracking-widest uppercase cursor-pointer"
-        >
-          Begin the Pipeline →
-        </button>
+        {/* Step 00 — the manuscript is sent to Gemini exactly once, here. */}
+        <div className="mt-8 flex items-center gap-5 flex-wrap">
+          <button
+            onClick={onCreate}
+            disabled={creating || !title.trim() || !text.trim()}
+            className="bg-[#2c2c2c] hover:bg-[#292622] text-[#d8cbb8] rounded-[3px] px-8 py-4 text-xs font-semibold tracking-widest uppercase cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {creating ? 'Ingesting Manuscript…' : 'Begin the Pipeline →'}
+          </button>
+
+          {creating ? (
+            <span className="flex items-center gap-2.5 text-xs text-[#615b53]">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#d49653] animate-pulse" />
+              Sending the text to Gemini once — this takes a few seconds.
+            </span>
+          ) : (
+            text.trim() && (
+              <span className="text-xs text-[#978e81]">
+                {text.trim().split(/\s+/).length.toLocaleString()} words ready
+              </span>
+            )
+          )}
+        </div>
       </div>
 
       <aside className="border-l border-[#b6ab9c] pl-8 flex flex-col gap-6">

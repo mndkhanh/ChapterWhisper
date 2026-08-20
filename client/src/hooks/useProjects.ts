@@ -1,88 +1,119 @@
-import { useState, useEffect, useCallback } from 'react';
-import type { Project } from '../types.js';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import type { Project, User } from '../types.js';
+import * as api from '../api/projects.js';
 
-const INITIAL_PROJECTS: Project[] = [
-  {
-    id: 'p1',
-    title: 'The Whisperwood Codex',
-    bookText: 'A wizarding-school tale of alchemy and shadows...',
-    wordCount: 41200,
-    style: 'Ink & Wash',
-    chapterIndex: 0,
-    statuses: ['done', 'done', 'done', 'done', 'done'],
-    characters: [
-      { id: 'c1', name: 'Prof. Adelaide Crane', description: 'Elder alchemist in velvet robes', prompt: 'Portrait of Prof. Adelaide Crane' },
-      { id: 'c2', name: 'Silas Vane', description: 'Curator of forbidden manuscripts', prompt: 'Portrait of Silas Vane' },
-    ],
-    chapters: [
-      { id: 'ch1', name: 'I. The Letter Beneath the Door', prompt: 'Adelaide finding the letter', characters: ['Prof. Adelaide Crane'] },
-    ],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-];
-
-export function useProjects(onToast: (msg: string) => void) {
-  const [projects, setProjects] = useState<Project[]>(() => {
-    const saved = localStorage.getItem('cw_projects');
-    if (saved) {
-      try { return JSON.parse(saved); } catch {}
-    }
-    return INITIAL_PROJECTS;
-  });
-
+/**
+ * Projects, backed by the server.
+ *
+ * There is deliberately no localStorage here. The server's JSON store is the
+ * only source of truth, which is what makes the pipeline resumable across a
+ * refresh, a logout, or a server restart — a cached copy in the browser would
+ * just be a second, staler answer.
+ */
+export function useProjects(user: User | null, onToast: (msg: string) => void) {
+  const [projects, setProjects] = useState<Project[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
 
-  useEffect(() => {
-    localStorage.setItem('cw_projects', JSON.stringify(projects));
-  }, [projects]);
+  const activeProject = projects.find((p) => p.id === activeId);
 
-  const activeProject = projects.find((p) => p.id === activeId) || projects[0];
+  // Held in a ref so an unmemoized callback from the caller cannot churn the
+  // dependencies of `refresh` and re-fire the load effect on every render.
+  const toastRef = useRef(onToast);
+  toastRef.current = onToast;
 
-  const createProject = useCallback((title: string, text: string) => {
-    if (!title.trim()) {
-      onToast('Please provide a title');
-      return null;
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      setProjects(await api.listProjects());
+    } catch (err: any) {
+      if (err?.status !== 401) toastRef.current(err?.message || 'Could not load your library');
+    } finally {
+      setLoading(false);
     }
-    const id = 'p' + Date.now();
-    const newProj: Project = {
-      id,
-      title: title.trim(),
-      bookText: text.trim() || 'Sample manuscript content...',
-      wordCount: text.trim() ? text.trim().split(/\s+/).length : 5000,
-      style: null,
-      chapterIndex: null,
-      statuses: ['ready', 'locked', 'locked', 'locked', 'locked'],
-      characters: [
-        { id: 'c1', name: 'Prof. Adelaide Crane', description: 'Adult · principal alchemist', prompt: 'Close-up portrait of Prof. Adelaide Crane' },
-        { id: 'c2', name: 'Silas Vane', description: 'Adult · scholar of ancient seals', prompt: 'Close-up portrait of Silas Vane' },
-      ],
-      chapters: [
-        { id: 'ch1', name: 'I. The Letter Beneath the Door', prompt: 'Scene illustrating the discovery of the seal', characters: ['Prof. Adelaide Crane', 'Silas Vane'] },
-      ],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    setProjects((prev) => [newProj, ...prev]);
-    setActiveId(id);
-    onToast('Manuscript project created');
-    return id;
-  }, [onToast]);
+  }, []);
 
-  const updateActiveProject = useCallback((updater: (p: Project) => void) => {
-    setProjects((prev) =>
-      prev.map((p) => {
-        if (p.id === activeId) {
-          const clone = { ...p, statuses: [...p.statuses] };
-          updater(clone);
-          clone.updatedAt = new Date().toISOString();
-          return clone;
-        }
-        return p;
-      })
-    );
-  }, [activeId]);
+  // Load on sign-in; drop everything on sign-out so the next user never sees
+  // the previous user's shelf.
+  useEffect(() => {
+    if (!user) {
+      setProjects([]);
+      setActiveId(null);
+      return;
+    }
+    void refresh();
+  }, [user, refresh]);
 
-  return { projects, setProjects, activeProject, activeId, setActiveId, createProject, updateActiveProject };
+  /** Merge a server response back into the list. The server's copy always wins. */
+  const applyProject = useCallback((updated: Project) => {
+    setProjects((prev) => {
+      const found = prev.some((p) => p.id === updated.id);
+      return found ? prev.map((p) => (p.id === updated.id ? updated : p)) : [updated, ...prev];
+    });
+  }, []);
+
+  const createProject = useCallback(
+    async (title: string, text: string): Promise<Project | null> => {
+      if (!title.trim()) {
+        toastRef.current('Please provide a title');
+        return null;
+      }
+      if (!text.trim()) {
+        toastRef.current('Please paste or upload the manuscript text');
+        return null;
+      }
+
+      setCreating(true);
+      try {
+        const { project, ingestionFailed } = await api.createProject(title.trim(), text.trim());
+        applyProject(project);
+        setActiveId(project.id);
+        // A 201 does not mean the book reached Gemini — the server swallows an
+        // ingestion failure. Say so now rather than letting step 01 quietly run
+        // against a model that never saw the manuscript.
+        toastRef.current(
+          ingestionFailed
+            ? 'Project created, but the manuscript never reached Gemini — check the server key'
+            : 'Manuscript ingested · ready for step one',
+        );
+        return project;
+      } catch (err: any) {
+        toastRef.current(err?.message || 'Could not create the project');
+        return null;
+      } finally {
+        setCreating(false);
+      }
+    },
+    [applyProject],
+  );
+
+  /** Opens a project, re-fetching it so a mid-step refresh shows the true state. */
+  const openProject = useCallback(
+    async (id: string): Promise<Project | null> => {
+      setActiveId(id);
+      try {
+        const fresh = await api.getProject(id);
+        applyProject(fresh);
+        return fresh;
+      } catch (err: any) {
+        toastRef.current(err?.message || 'Could not open that project');
+        return null;
+      }
+    },
+    [applyProject],
+  );
+
+  return {
+    projects,
+    loading,
+    creating,
+    activeProject,
+    activeId,
+    setActiveId,
+    createProject,
+    openProject,
+    applyProject,
+    refresh,
+  };
 }
-

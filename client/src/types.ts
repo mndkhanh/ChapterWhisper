@@ -23,6 +23,16 @@ export interface ChapterItem {
   illustrationUrl?: string;
 }
 
+/** The chain of Gemini interaction ids; each step reads the previous one. */
+export interface ProjectInteractions {
+  ingestionId?: string;
+  styleId?: string;
+  charactersId?: string;
+  portraitsId?: string;
+  chaptersId?: string;
+  illustrationId?: string;
+}
+
 export interface Project {
   id: string;
   title: string;
@@ -33,6 +43,10 @@ export interface Project {
   statuses: StepStatus[];
   characters: CharacterItem[];
   chapters: ChapterItem[];
+  interactions: ProjectInteractions;
+  /** Message from the last failed step; cleared when a step starts. */
+  error?: string | null;
+  stepStartedAt?: number | null;
   createdAt: string;
   updatedAt: string;
 }

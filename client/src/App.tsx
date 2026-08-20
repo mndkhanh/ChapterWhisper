@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { Header } from './components/layout/Header.js';
 import { LoginScreen } from './components/auth/LoginScreen.js';
 import { LibraryView } from './components/library/LibraryView.js';
@@ -9,6 +9,7 @@ import { Toast } from './components/common/Toast.js';
 import { useAuth } from './hooks/useAuth.js';
 import { useProjects } from './hooks/useProjects.js';
 import { usePipeline } from './hooks/usePipeline.js';
+import type { Project, StepStatus } from './types.js';
 
 export function App() {
   const [screen, setScreen] = useState<'login' | 'projects' | 'new' | 'pipeline' | 'result'>('login');
@@ -21,45 +22,61 @@ export function App() {
   const [toast, setToast] = useState<string | null>(null);
   const toastTimeout = useRef<number | undefined>(undefined);
 
-  const showToast = (msg: string) => {
+  // Must be stable: hooks below take it as a dependency, and a fresh function
+  // each render would re-fire their effects in a loop.
+  const showToast = useCallback((msg: string) => {
     setToast(msg);
     window.clearTimeout(toastTimeout.current);
-    toastTimeout.current = window.setTimeout(() => setToast(null), 3500);
-  };
+    toastTimeout.current = window.setTimeout(() => setToast(null), 5000);
+  }, []);
 
-  // 1. Auth Hook
+  // 1. Auth
   const { user, login, logout } = useAuth(showToast);
 
-  // Switch to projects automatically once logged in
   React.useEffect(() => {
-    if (user && screen === 'login') {
-      setScreen('projects');
-    }
+    if (user && screen === 'login') setScreen('projects');
   }, [user, screen]);
 
-  // 2. Projects Hook
-  const {
-    projects,
-    activeProject,
-    setActiveId,
-    createProject,
-    updateActiveProject,
-  } = useProjects(showToast);
+  // 2. Projects — server-backed
+  const { projects, creating, activeProject, createProject, openProject, applyProject } =
+    useProjects(user, showToast);
 
-  // 3. Pipeline Hook
+  // 3. Pipeline — server-backed
   const {
     stepIndex,
     setStepIndex,
     customStyle,
     setCustomStyle,
+    busyStep,
+    pendingStyle,
+    pendingChapterIndex,
     selectStep,
     updateStyle,
     applyCustomStyle,
-    selectChapter,
     runStep,
     nextStep,
     prevStep,
-  } = usePipeline(activeProject, updateActiveProject, showToast);
+  } = usePipeline(activeProject, applyProject, showToast);
+
+  /**
+   * What the pipeline screen renders: the server's project, plus the two
+   * selections that only exist in the browser until a step runs, plus the
+   * in-flight step shown as `running`.
+   *
+   * The server does persist `running` before it starts the Gemini call, but it
+   * does not respond until the call finishes, so this request's own tab would
+   * otherwise show a stale status for the whole 10-30s wait. Other tabs read
+   * the real one from the server and get their 409.
+   */
+  const displayProject: Project | undefined = activeProject && {
+    ...activeProject,
+    style: pendingStyle ?? activeProject.style,
+    chapterIndex: pendingChapterIndex ?? activeProject.chapterIndex,
+    statuses:
+      busyStep === null
+        ? activeProject.statuses
+        : activeProject.statuses.map((s, i): StepStatus => (i === busyStep ? 'running' : s)),
+  };
 
   const handleLoginSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -67,8 +84,7 @@ export function App() {
       showToast('Please enter both name and email');
       return;
     }
-    const success = await login(loginName, loginEmail);
-    if (success) setScreen('projects');
+    if (await login(loginName, loginEmail)) setScreen('projects');
   };
 
   const handleLogoutClick = async () => {
@@ -76,9 +92,9 @@ export function App() {
     setScreen('login');
   };
 
-  const handleCreateProjectSubmit = () => {
-    const id = createProject(npTitle, npText);
-    if (id) {
+  const handleCreateProjectSubmit = async () => {
+    const project = await createProject(npTitle, npText);
+    if (project) {
       setStepIndex(0);
       setScreen('pipeline');
     }
@@ -86,33 +102,37 @@ export function App() {
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const text = ev.target?.result as string;
-        setNpText(text);
-        setUploadHint(`${file.name} · ${text.split(/\s+/).length.toLocaleString()} words loaded`);
-        showToast('Manuscript file loaded');
-      };
-      reader.readAsText(file);
-    }
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = (ev.target?.result as string) ?? '';
+      setNpText(text);
+      setUploadHint(`${file.name} · ${text.split(/\s+/).length.toLocaleString()} words loaded`);
+      showToast('Manuscript file loaded');
+    };
+    reader.readAsText(file);
   };
 
-  const openProject = (id: string) => {
-    setActiveId(id);
-    const p = projects.find((x) => x.id === id);
-    if (p) {
-      let idx = p.statuses.indexOf('ready');
-      if (idx === -1) idx = p.statuses.lastIndexOf('done');
-      if (idx === -1) idx = 0;
-      setStepIndex(idx);
-    }
+  /** Opens a project and lands on the step the server says is next. */
+  const handleOpenProject = async (id: string) => {
     setScreen('pipeline');
+    const p = await openProject(id);
+    if (!p) return;
+    let idx = p.statuses.findIndex((s) => s === 'running' || s === 'failed');
+    if (idx === -1) idx = p.statuses.indexOf('ready');
+    if (idx === -1) idx = Math.max(0, p.statuses.lastIndexOf('done'));
+    setStepIndex(idx);
+  };
+
+  const goNew = () => {
+    setScreen('new');
+    setNpTitle('');
+    setNpText('');
+    setUploadHint('accepts a single .txt manuscript');
   };
 
   return (
     <div className="min-h-screen bg-[#d8cbb8] text-[#2c2c2c] font-sans selection:bg-[#d49653] selection:text-[#292622]">
-      {/* 1. Login View */}
       {screen === 'login' && (
         <LoginScreen
           name={loginName}
@@ -123,34 +143,31 @@ export function App() {
         />
       )}
 
-      {/* Main Studio Shell */}
       {screen !== 'login' && (
         <div>
-          {/* Global Atelier Header */}
           <Header
             screen={screen}
             user={user}
             onNavigateLibrary={() => setScreen('projects')}
-            onNavigateNew={() => { setScreen('new'); setNpTitle(''); setNpText(''); }}
+            onNavigateNew={goNew}
             onLogout={handleLogoutClick}
           />
 
-          {/* 2. Library Dashboard View */}
           {screen === 'projects' && (
             <LibraryView
               user={user}
               projects={projects}
-              onOpenProject={openProject}
-              onNewProject={() => { setScreen('new'); setNpTitle(''); setNpText(''); }}
+              onOpenProject={handleOpenProject}
+              onNewProject={goNew}
             />
           )}
 
-          {/* 3. New Project Creation View */}
           {screen === 'new' && (
             <NewProjectView
               title={npTitle}
               text={npText}
               uploadHint={uploadHint}
+              creating={creating}
               onTitleChange={setNpTitle}
               onTextChange={setNpText}
               onFileUpload={handleFileUpload}
@@ -158,17 +175,16 @@ export function App() {
             />
           )}
 
-          {/* 4. Pipeline Studio View */}
-          {screen === 'pipeline' && activeProject && (
+          {screen === 'pipeline' && displayProject && (
             <PipelineStudio
-              project={activeProject}
+              project={displayProject}
               stepIndex={stepIndex}
               customStyle={customStyle}
+              pendingStyle={pendingStyle}
               onSelectStep={selectStep}
               onUpdateStyle={updateStyle}
               onCustomStyleChange={setCustomStyle}
               onApplyCustomStyle={applyCustomStyle}
-              onSelectChapter={selectChapter}
               onRunStep={runStep}
               onNextStep={nextStep}
               onPrevStep={prevStep}
@@ -176,10 +192,9 @@ export function App() {
             />
           )}
 
-          {/* 5. Result Gallery View */}
-          {screen === 'result' && activeProject && (
+          {screen === 'result' && displayProject && (
             <ResultView
-              project={activeProject}
+              project={displayProject}
               onBackToPipeline={() => setScreen('pipeline')}
               onReturnLibrary={() => setScreen('projects')}
             />
@@ -187,11 +202,9 @@ export function App() {
         </div>
       )}
 
-      {/* Floating Global Toast Notification */}
       <Toast message={toast} />
     </div>
   );
 }
 
 export default App;
-
