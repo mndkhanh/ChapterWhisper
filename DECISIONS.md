@@ -33,4 +33,4 @@ AI recommends gemini-3.1-flash-image and gemini-3.7-flash, but gemini-3.7-flash 
 ## 9. what AI workflow I chose
 
 Obsidian for docs refereing acts as long-lasting documents, references for AI coding between sessions and for human-readable visualized structure. Antigravity acts as plan maker/bug catch/Frontend wiring, Claude works as bug fixing/ Main on BE/ UIUX design:
-Claude.ai/design --> Start session --> read obsidian-based docs/ --> agy deisgn docs, plan, context --> claude does backend things --> testing --> agy wire up ui --> testing UI --> integration test --> update docs/ for next session --> start again new loop.
+Choose style on [Style refero Design](https://styles.refero.design/) for style context --> Claude.ai/design --> Start session --> read obsidian-based docs/ --> agy deisgn docs, plan, context --> claude does backend things --> testing --> agy wire up ui --> testing UI --> integration test --> update docs/ for next session --> start again new loop.
