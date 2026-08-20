@@ -15,30 +15,15 @@ client's data layer is real `fetch` against that API — the `localStorage` mock
 `setTimeout` fake step runner are **gone**. What remains fake is narrower and specific; see
 "What is still mocked" below before touching the pipeline screens.
 
-`npm test` currently passes **35 server tests + 32 client tests** (67 total). Re-run it rather than trusting
+`npm test` currently passes **39 server tests + 34 client tests** (73 total). Re-run it rather than trusting
 any count written down here or in `Progress.md` — both rot.
 
 ## What is still mocked
 
-The data layer is done, and steps 01–04 plus the result screen now render real server data.
-Two leftovers from the visual mock remain:
-
-- **`SAMPLE_CHAPTERS`** — a hardcoded list of three chapter titles in `PipelineStudio.tsx`.
-  A single use survives, at line 330: step 05's placeholder title before the illustration
-  exists. Step 04 renders real `project.chapters` behind a "Formulate Chapter Scene" card, and
-  `ResultView` now renders the real chapter, cast, portraits, and finished plate. The server
-  caps chapters at **one** (`runStep4Chapters` stores a single-element array), so any index past 0 cannot
-  correspond to anything — which is precisely what that surviving lookup does.
-- **`pendingChapterIndex` is a selection with nothing left to select.** Step 04 takes **no user
-  input** by design — the model picks the scene, the server stores exactly one chapter, and
-  `chapterIndex` is always 0. `usePipeline` still carries `pendingChapterIndex` and
-  `selectChapter`, and any picker UI is now dead weight; all of it should go. Do not re-add a
-  chooser or a free-text box here: "the user chooses nothing in step 04" is a deliberate call
-  (the AI's generate-every-chapter-then-select design was overridden), not an oversight.
-
-`DEFAULT_STYLES` in `PipelineStudio.tsx` is **not** in this category — the server has no styles
-endpoint, and step 01 takes an optional `{ style }` override, so client-side presets are the
-intended design (and `DECISIONS.md` §2 records that call deliberately).
+The data layer, pipeline runner, real-time WebSocket sync, attempt history, and slide presentation are all fully implemented.
+- **Zero hardcoded chapter lists**: `SAMPLE_CHAPTERS` and redundant pickers are removed. Step 04 renders server-generated `project.chapters` directly.
+- **`DEFAULT_STYLES` in `PipelineStudio.tsx`** is client-side presets for Step 01 fail-safe art styles (recorded in `DECISIONS.md` §2).
+- **Gemini API in Tests**: Tests mock `createInteraction` via `vi.mock('../src/gemini/client.js')` to protect API quotas and keep CI runs instant and hermetic without live API keys.
 
 ## The client data layer
 
@@ -192,11 +177,13 @@ known-gaps list.
 
 ```
 package.json                    workspaces: [server, client]; all dev/test/build entry points
+.github/workflows/ci.yml        GitHub Actions CI workflow (Node 20.x & 22.x matrix build + test)
 
-server/   Express 4 + TS (ESM, NodeNext)
-  src/index.ts                  dotenv.config(), PORT, listen — nothing else
+server/   Express 4 + TS (ESM, NodeNext) + ws
+  src/index.ts                  dotenv.config(), PORT, http.createServer, setupWebSocketServer, listen
   src/app.ts                    createApp(): cors → cookie-parser → json({limit:'5mb'})
                                 → /api/health → /api/auth → /api/projects
+  src/websocket.ts              WebSocket server: cookie auth, project subscription, real-time broadcasts
   src/config.ts                 lazy env accessors: getDataDir/getJwtSecret/getJwtExpiresIn,
                                 getGeminiApiKey/getGeminiBaseUrl/getTextModel/getImageModel,
                                 getStepStaleMs
@@ -207,17 +194,22 @@ server/   Express 4 + TS (ESM, NodeNext)
   src/auth/middleware.ts        requireAuth — cookie only, re-reads the user from the store
   src/auth/routes.ts            login / me / logout
   src/gemini/client.ts          Interactions REST client + outputText/outputImage/JSON parsing
-  src/projects/types.ts         Project, StepStatus, Character, Chapter
+  src/projects/types.ts         Project, StepStatus, Character, Chapter, StepAttempt
+  src/projects/events.ts        Project event bus emitting live state updates
   src/projects/project-store.ts getProject/saveProject/mutateProject/listUserProjects
-  src/projects/pipeline-runner.ts  ingestBook + executeStep + the five runStepN functions
+  src/projects/pipeline-runner.ts  ingestBook + executeStep + attempt duration tracking + character consistency
   src/projects/routes.ts        projects CRUD, step run, portrait/illustration streaming
-  data/                         runtime store (users.json, projects/, storage/) AND the
-                                unread lantern-corridor.txt test manuscript
-  tests/                        supertest against createApp(): auth, json-file, projects, health
+  data/                         runtime store (users.json, projects/, storage/)
+  tests/                        vitest & supertest: auth, json-file, projects, pipeline, websocket, health
 
 client/   Vite 6 + React 18 + TS + Tailwind 3
   src/App.tsx                   screen switch + displayProject derivation
-  src/types.ts                  client mirror of the server Project shape
+  src/types.ts                  client mirror of server Project & StepAttempt types
+  src/hooks/usePipeline.ts      step runner hook + WebSocket auto-subscription (/ws)
+  src/components/library/       LibraryView with completed illustration preview & Present Slides button
+  src/components/presentation/  SlidePresentationModal (5-slide fullscreen deck with keyboard nav)
+  src/components/result/        ResultView (master composition plate, reading view, cast dossier)
+  src/components/pipeline/      PipelineStudio (5-step atelier + per-step attempt history)
   src/api/http.ts               shared request() + ApiError
   src/api/projects.ts           projects/pipeline calls + StepFailedError
   src/api/auth.ts               login / me / logout
@@ -481,6 +473,15 @@ did exactly that and have since been rewritten against the API — don't reintro
 - **Git history** — small, meaningful, incremental commits with real messages, committed as
   work happens. No single giant commit; reviewers look at timestamps. Note in the message body
   when a commit was mostly AI-authored — the PRD says honesty scores and hiding it doesn't.
+
+## What is deliberately not tested & known gaps
+
+1. **Live Gemini Network Calls**: All automated tests mock `createInteraction` to avoid quota exhaustion and allow hermetic CI runs without API keys. Live network latency, rate limits (HTTP 429), and quota exhaustion are not covered in `npm test`.
+2. **Client-Side WebSocket Reconnect Loop**: Server WebSocket upgrade and broadcast delivery are tested in `websocket.test.ts`, but the client hook's (`usePipeline.ts`) 3-second reconnect loop on unexpected socket drop is not tested in Vitest.
+3. **Isolated `PipelineStudio.test.tsx`**: Studio behavior is tested end-to-end via `App.test.tsx`, but isolated unit assertions on attempt history drawer badges (`✓ Succeeded` / `✕ Failed`) and custom style text inputs are not in a standalone component test file.
+4. **Cross-Tenant Media Authorization**: `/api/projects/:id/portraits/:charId` and `/illustrations/:chId` stream files without requiring authentication cookies (designed for simple `<img src="..." />` tags without blob headers), so isolation relies on unpredictable UUID paths.
+5. **Slide Presentation Empty States**: Opening the presentation modal on an empty project before Step 02 or Step 04 has completed relies on fallback labels.
+6. **Non-text file upload validation**: Dropping binary files into `NewProjectView` relies on client file reader parsing.
 
 ## Working style for this repo
 

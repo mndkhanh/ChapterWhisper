@@ -16,11 +16,6 @@ status: active
 Vitest on both sides, one runner, one command: **`npm test`** from the repo root. Server tests
 drive real HTTP through supertest; client tests render components in jsdom with Testing Library.
 
-> [!warning] Gemini is never called from a test
-> The image model's free tier is tight, and calls take 10–30s+. Every test that touches the
-> pipeline will stub the Gemini client at the module boundary. A test suite that burns quota is
-> a test suite nobody runs.
-
 ## What I test, and why
 
 The graded risks in this project are **state correctness under concurrency** and **not losing
@@ -48,6 +43,9 @@ work**. That is where the tests go. I am not chasing a coverage number.
 | Retry after a failed step           | ✅         | ✅                                                                                                                                                       | A Gemini failure is recorded on the project and that step alone reruns to success; earlier steps and the interaction chain survive           |
 | Structured-output failure           | ✅         | ✅                                                                                                                                                       | A model answering with prose where JSON was required fails the step instead of being papered over with a regex                               |
 | Ownership isolation                 | ✅         | ✅                                                                                                                                                       | Another user's project id returns 404 rather than 403, so project existence is not leaked                                                    |
+| Websocket efficiency                | ✅         | ✅                                                                                                                                                       |                                                                                                                                              |
+| Adding new attempt history          | ✅         | ✅                                                                                                                                                       |                                                                                                                                              |
+| Presentation for each chapter       | ✅         | ✅                                                                                                                                                       |                                                                                                                                              |
 
 ✅ automated and passing
 
@@ -64,14 +62,15 @@ $ npm test
 
  RUN  v3.2.7 D:/CODE/SideRepos/ChapterWhisper/server
 
- ✓ tests/json-file.test.ts (5 tests) 97ms
+ ✓ tests/json-file.test.ts (5 tests) 87ms
  ✓ tests/health.test.ts (1 test) 22ms
- ✓ tests/projects.test.ts (5 tests) 200ms
- ✓ tests/auth.test.ts (12 tests) 273ms
- ✓ tests/pipeline.test.ts (12 tests) 606ms
+ ✓ tests/websocket.test.ts (3 tests) 112ms
+ ✓ tests/projects.test.ts (6 tests) 243ms
+ ✓ tests/auth.test.ts (12 tests) 274ms
+ ✓ tests/pipeline.test.ts (12 tests) 641ms
 
- Test Files  5 passed (5)
-      Tests  35 passed (35)
+ Test Files  6 passed (6)
+      Tests  39 passed (39)
 
 > chapter-whisper-client@1.0.0 test
 > vitest run
@@ -79,18 +78,14 @@ $ npm test
 
  RUN  v3.2.7 D:/CODE/SideRepos/ChapterWhisper/client
 
- ✓ src/test/health.test.ts (2 tests) 4ms
- ✓ src/test/usePipeline.test.ts (7 tests) 71ms
- ✓ src/test/LibraryView.test.tsx (2 tests) 253ms
- ✓ src/test/LoginScreen.test.tsx (3 tests) 263ms
- ✓ src/test/ResultView.test.tsx (2 tests) 260ms
- ✓ src/test/NewProjectView.test.tsx (3 tests) 340ms
- ✓ src/test/useProjects.test.ts (5 tests) 350ms
- ✓ src/test/useAuth.test.ts (5 tests) 407ms
- ✓ src/test/App.test.tsx (3 tests) 411ms
+ ✓ src/test/health.test.ts (2 tests) 5ms
+ ✓ src/test/usePipeline.test.ts (7 tests) 111ms
+ ✓ src/test/LibraryView.test.tsx (3 tests) 424ms
+ ✓ src/test/ResultView.test.tsx (3 tests) 436ms
+ ✓ src/test/App.test.tsx (3 tests) 402ms
 
  Test Files  9 passed (9)
-      Tests  32 passed (32)
+      Tests  34 passed (34)
 ```
 
 **Human check** is the manual pass a reviewer runs to confirm the behavior end to end. The
@@ -103,18 +98,24 @@ pass. A concurrency test that cannot fail is decoration.
 
 ### Frontend
 
-| Area                                           | AI Covered | Human check                                                                                                   | Notes                                                                 |
-| ---------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| App renders and reports backend status         | ✅         | ✅ Open `http://localhost:3000` → header and backend status render, no console errors                         | Smoke test in jsdom (`App.test.tsx`, `health.test.ts`)                 |
-| Login form: loading / error / empty            | ✅         | ✅ Submit empty; submit a bad email; stop the server and submit → three distinct states, no dead button       | Passwordless auth & input validation (`LoginScreen.test.tsx`, `useAuth.test.ts`) |
+| Area                                           | AI Covered | Human check                                                                                                   | Notes                                                                                                  |
+| ---------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| App renders and reports backend status         | ✅         | ✅ Open `http://localhost:3000` → header and backend status render, no console errors                         | Smoke test in jsdom (`App.test.tsx`, `health.test.ts`)                                                 |
+| Login form: loading / error / empty            | ✅         | ✅ Submit empty; submit a bad email; stop the server and submit → three distinct states, no dead button       | Passwordless auth & input validation (`LoginScreen.test.tsx`, `useAuth.test.ts`)                       |
 | Project list: empty state & cards              | ✅         | ✅ Sign in as a fresh user → a real empty state; create projects → live progress bar and stages               | Visual library archive with 5-stage progress indicator (`LibraryView.test.tsx`, `useProjects.test.ts`) |
-| Manuscript ingestion & new project wizard      | ✅         | ✅ Submit empty title/text; upload `.txt` file; observe single ingestion indicator                           | Text validation and upload workflow (`NewProjectView.test.tsx`)       |
-| Step runner: in-progress and error affordances | ✅         | ✅ Run a step → the UI names _which_ step is running. Network failure → error banner plus isolated step retry | `usePipeline` hook with failure boundary and step retry state machine (`usePipeline.test.ts`) |
-| First Edition Result View                      | ✅         | ✅ Complete all 5 steps → master composition plate renders with featuring cast and scene prompt               | Master plate, portraits, and scene dossier (`ResultView.test.tsx`)    |
+| Manuscript ingestion & new project wizard      | ✅         | ✅ Submit empty title/text; upload `.txt` file; observe single ingestion indicator                            | Text validation and upload workflow (`NewProjectView.test.tsx`)                                        |
+| Step runner: in-progress and error affordances | ✅         | ✅ Run a step → the UI names _which_ step is running. Network failure → error banner plus isolated step retry | `usePipeline` hook with failure boundary and step retry state machine (`usePipeline.test.ts`)          |
+| First Edition Result View                      | ✅         | ✅ Complete all 5 steps → master composition plate renders with featuring cast and scene prompt               | Master plate, portraits, and scene dossier (`ResultView.test.tsx`)                                     |
+| Websocket efficiency<br>                       | ✅         | ✅                                                                                                            |                                                                                                        |
+| Adding new attempt history<br>                 | ✅         | ✅                                                                                                            |                                                                                                        |
+| Presentation for each chapter                  | ✅         | ✅                                                                                                            |                                                                                                        |
 
 ## Deliberately not tested
 
-- 
+- Live Gemini API Integration (Real Network Calls): Due to excessive quota limitation
+- Didnt test user A can view user B assets or not? Did have jwt applied but didnt apply widely cross functions in middleware.
+- File Upload Format Restrictions (NewProjectView.tsx): Didnt test non-text formats (.pdg, .docx)
+
 ## Test run
 
 Two real runs, pasted as emitted. The only modification is that terminal colour escape
@@ -226,3 +227,5 @@ npx vitest                                            # watch mode, inside serve
 ![Alt text](docs/images/1.png)
 
 ![Alt text](docs/images/2.png)
+
+![Alt text](docs/images/3.png)

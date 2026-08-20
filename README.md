@@ -8,6 +8,16 @@ refresh, a logout, or a server restart mid-run.
 
 ---
 
+## Highlights & Features
+
+- **Sequential 5-Step Pipeline** — Ingest once, then chain Gemini interactions (`previous_interaction_id`).
+- **Real-Time Step Updates (WebSocket)** — Two-way WebSocket channel (`ws://localhost:4000/ws`) keeps multi-tab and concurrent client state synchronized with zero polling.
+- **Per-Step Attempt & Execution History** — Tracks execution timestamps, durations, success pills, and retry error logs per step.
+- **Slide-Like Presentation Mode** — Interactive full-screen reader and slide deck (`✦ Present Chapter Slides`) showcasing the prologue, character dossier, scene formulation, masterwork composition plate, and side-by-side illustrated reading spread.
+- **CI Pipeline (GitHub Actions)** — Automated build, type-check, and multi-version Node.js test runs on every push and pull request.
+
+---
+
 ## Prerequisites
 
 | Need | Version |
@@ -31,7 +41,7 @@ Then open `server/.env` and set `GEMINI_API_KEY` to your key.
 npm run dev
 ```
 
-Server on **http://localhost:4000**, client on **http://localhost:3000**. Open the
+Server on **http://localhost:4000** (HTTP + WebSocket), client on **http://localhost:3000**. Open the
 client. That is the only command needed to start the stack.
 
 ## Test
@@ -40,7 +50,7 @@ client. That is the only command needed to start the stack.
 npm test
 ```
 
-35 server tests + 32 client tests (67 total). No network, no API key, no `.env` required — the
+**39 server tests + 34 client tests (73 total)**. No network, no API key, no `.env` required — the
 Gemini client is mocked and the storage tests run against a temp directory, so your
 real `data/` and your quota are never touched.
 
@@ -52,9 +62,6 @@ npm test --workspace=server -- -t "refuses to re-run a completed step"
 ```
 
 ---
-## More
-
-
 
 ## More
 
