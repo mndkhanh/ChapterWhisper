@@ -1,4 +1,4 @@
-﻿---
+---
 title: Project File Index & Registry
 aliases:
   - Files
@@ -26,11 +26,12 @@ Complete map of all tracked source code, configuration, scripts, and documentati
 
 ## 📚 Documentation & Obsidian Vault (`docs/`)
 - [[Index.md|docs/Index.md]] — Main vault hub & Map of Content (MOC)
-- [[PRD.md|docs/PRD.md]] — Full assessment requirements brief (Source of truth)
-- [[Architecture.md|docs/Architecture.md]] — System architecture & data flow
-- [[Progress.md|docs/Progress.md]] — Milestone tracker & roadmap
-- [[DESIGN.md|docs/DESIGN.md]] — Amrit Palace visual design tokens
-- [[Files.md|docs/Files.md]] — This file registry
+- [[PRD.md|docs/spec/PRD.md]] — Full assessment requirements brief (Source of truth)
+- [[Pipeline.md|docs/spec/Pipeline.md]] — 5-step Gemini pipeline contract & prompt schemas
+- [[Architecture.md|docs/architecture/Architecture.md]] — System architecture & data flow
+- [[Progress.md|docs/tracking/Progress.md]] — Milestone tracker & roadmap
+- [[DESIGN.md|docs/design/DESIGN.md]] — Amrit Palace visual design tokens
+- [[Files.md|docs/tracking/Files.md]] — This file registry
 
 ## ⚙️ Backend Server (`server/`)
 - [[server/src/index.ts]] — Express server entry point & HTTP router
@@ -43,7 +44,10 @@ Complete map of all tracked source code, configuration, scripts, and documentati
 - [[client/src/main.tsx]] — React DOM client entry point
 - [[client/src/index.css]] — Global stylesheet & design token classes
 - [[client/src/test/health.test.ts]] — Client sanity test
+- [[client/src/test/App.test.tsx]] — Client App component test
+- [[client/src/test/setup.ts]] — Client test setup with `@testing-library/jest-dom`
 - [[client/index.html]] — HTML page container
 - [[client/vite.config.ts]] — Vite bundler & API proxy configuration
+- [[client/vitest.config.ts]] — Vitest configuration with `jsdom`
 - [[client/package.json]] — Client dependencies & scripts
 - [[client/tsconfig.json]] — Client TypeScript configuration
