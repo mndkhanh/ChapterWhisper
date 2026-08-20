@@ -1,4 +1,4 @@
-﻿---
+---
 title: Project Progress & Milestone Tracker
 aliases:
   - Progress
@@ -39,14 +39,13 @@ Tracking active implementation milestones, verification status, and deliverable 
 
 ## Milestone 4: Frontend UI / UX (Amrit Palace Design System)
 - [x] Tailwind CSS configuration with Amrit Palace design tokens
-- [ ] Studio authentication & user session handling
-- [ ] Project dashboard with step progress stepper and status badges
-- [ ] New project modal supporting `.txt` file upload and text pasting
-- [ ] Full book text reader modal
-- [ ] Interactive 5-step manuscript pipeline screen
-- [ ] Character cards with live portrait loading states
-- [ ] Chapter illustration presentation
-- [ ] In-progress step indicator and error retry affordance
+- [x] Studio authentication & user session handling (`LoginScreen`)
+- [x] Project dashboard with step progress stepper and status badges (`LibraryView`)
+- [x] New project creation supporting `.txt` file upload and text pasting (`NewProjectView`)
+- [x] Interactive 5-step manuscript pipeline runner screen (`PipelineStudio`)
+- [x] Character cards with live adult cap callout and portrait loading states
+- [x] Chapter illustration presentation & result plate view (`ResultView`)
+- [x] In-progress step indicator, state machines, and retry affordances
 
 ## Milestone 5: Testing & Deliverables
 - [x] Backend tests for identity and the concurrency-safe JSON store (18 passing)
