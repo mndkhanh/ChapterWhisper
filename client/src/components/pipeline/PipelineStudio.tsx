@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { Project, StepStatus } from '../../types.js';
 
 const META = [
@@ -13,6 +13,63 @@ const DEFAULT_STYLES = [
   { id: 'ink', name: 'Ink & Wash', desc: 'Loose etched linework flooded with translucent grey wash — spare, literary, close to the page.' },
   { id: 'oil', name: 'Golden-Age Oil', desc: 'Warm varnished oil in the Rackham tradition — deep shadow, amber highlight, painterly grain.' },
 ];
+
+/** Roughly how long each step blocks for, so the wait has a shape. */
+const STEP_EXPECTATION = [
+  'Usually 10–30 seconds.',
+  'Usually 10–30 seconds.',
+  'Image generation — usually 30–60 seconds.',
+  'Usually 10–30 seconds.',
+  'Image generation — usually 30–60 seconds.',
+];
+
+/**
+ * The only in-progress signal used to be a disabled button reading
+ * "Generating..." — and on steps 01, 02 and 04, nothing at all. A blocking call
+ * that runs for half a minute needs to look alive.
+ *
+ * Elapsed time is measured from the server's `stepStartedAt` when there is one,
+ * so a tab that opens mid-step shows the true elapsed time rather than
+ * restarting the clock at zero.
+ */
+const RunningBanner: React.FC<{ project: Project; stepIndex: number }> = ({ project, stepIndex }) => {
+  const [now, setNow] = useState(() => Date.now());
+  const startedAt = useRef(project.stepStartedAt ?? Date.now());
+
+  useEffect(() => {
+    startedAt.current = project.stepStartedAt ?? Date.now();
+    setNow(Date.now());
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [project.stepStartedAt, stepIndex]);
+
+  const elapsed = Math.max(0, Math.round((now - startedAt.current) / 1000));
+  const lastGood = (project.attempts || [])
+    .filter((a) => a.stepIndex === stepIndex && a.status === 'done')
+    .slice(-1)[0];
+
+  return (
+    <div
+      role="status"
+      className="mb-8 border-l-2 border-[#d49653] bg-[#d49653]/10 p-4 flex items-center gap-4 flex-wrap"
+    >
+      <span className="w-2 h-2 rounded-full bg-[#d49653] animate-pulse shrink-0" />
+      <div className="flex-1 min-w-[220px]">
+        <div className="text-[11px] tracking-[0.18em] font-semibold uppercase text-[#d49653]">
+          Working · {META[stepIndex].title}
+        </div>
+        <p className="text-xs text-[#615b53] mt-1 leading-relaxed">
+          {STEP_EXPECTATION[stepIndex]} The step is held on the server, so you can refresh or close
+          this tab without losing it.
+          {lastGood && ` Last run took ${(lastGood.durationMs / 1000).toFixed(1)}s.`}
+        </p>
+      </div>
+      <span className="font-mono text-2xl font-light text-[#2c2c2c] tabular-nums">
+        {Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, '0')}
+      </span>
+    </div>
+  );
+};
 
 interface PipelineStudioProps {
   project: Project;
@@ -105,6 +162,10 @@ export const PipelineStudio: React.FC<PipelineStudioProps> = ({
         <h1 className="font-serif font-light uppercase text-5xl md:text-6xl tracking-tight mb-3">{META[stepIndex].title}</h1>
         <p className="max-w-xl text-sm leading-relaxed text-[#615b53] mb-8">{META[stepIndex].desc}</p>
         <div className="h-px bg-[#b6ab9c] mb-8" />
+
+        {project.statuses[stepIndex] === 'running' && (
+          <RunningBanner project={project} stepIndex={stepIndex} />
+        )}
 
         {/* Step 1: Art Style */}
         {stepIndex === 0 && (

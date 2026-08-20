@@ -11,6 +11,16 @@ import { useProjects } from './hooks/useProjects.js';
 import { usePipeline } from './hooks/usePipeline.js';
 import type { Project, StepStatus } from './types.js';
 
+/** Where the open project is remembered so a refresh returns to it. */
+const ACTIVE_KEY = 'cw_active_project';
+
+/**
+ * Toasts arrive from three hooks as a bare string, so failure is inferred
+ * rather than flagged. Errors get the red treatment, `role="alert"`, and a
+ * longer life — a 409 or an expired session must not vanish unread.
+ */
+const LOOKS_LIKE_ERROR = /\b(fail|failed|error|409|expired|could not|never reached|please)\b/i;
+
 export function App() {
   const [screen, setScreen] = useState<'login' | 'projects' | 'new' | 'pipeline' | 'result'>('login');
   const [loginName, setLoginName] = useState('');
@@ -21,14 +31,22 @@ export function App() {
   const [uploadHint, setUploadHint] = useState('accepts a single .txt manuscript');
   const [opening, setOpening] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [toastIsError, setToastIsError] = useState(false);
   const toastTimeout = useRef<number | undefined>(undefined);
 
   // Must be stable: hooks below take it as a dependency, and a fresh function
   // each render would re-fire their effects in a loop.
   const showToast = useCallback((msg: string) => {
+    const isError = LOOKS_LIKE_ERROR.test(msg);
     setToast(msg);
+    setToastIsError(isError);
     window.clearTimeout(toastTimeout.current);
-    toastTimeout.current = window.setTimeout(() => setToast(null), 5000);
+    toastTimeout.current = window.setTimeout(() => setToast(null), isError ? 12000 : 5000);
+  }, []);
+
+  const dismissToast = useCallback(() => {
+    window.clearTimeout(toastTimeout.current);
+    setToast(null);
   }, []);
 
   // 1. Auth
@@ -112,12 +130,20 @@ export function App() {
 
   const handleLogoutClick = async () => {
     await logout();
+    forgetActive();
+    restored.current = true;
     setScreen('login');
   };
 
   const handleCreateProjectSubmit = async () => {
     const project = await createProject(npTitle, npText);
     if (project) {
+      try {
+        sessionStorage.setItem(ACTIVE_KEY, project.id);
+      } catch {
+        /* the restore is a convenience, not state */
+      }
+      restored.current = true;
       setStepIndex(0);
       setScreen('pipeline');
     }
@@ -161,6 +187,14 @@ export function App() {
           setScreen('projects');
           return;
         }
+        // Remembered so a refresh mid-pipeline reopens here instead of dropping
+        // the author back on the shelf — the server state was always resumable,
+        // the screen was not.
+        try {
+          sessionStorage.setItem(ACTIVE_KEY, id);
+        } catch {
+          /* private mode — the restore is a convenience, not state */
+        }
         let idx = p.statuses.findIndex((s) => s === 'running' || s === 'failed');
         if (idx === -1) idx = p.statuses.indexOf('ready');
         if (idx === -1) idx = Math.max(0, p.statuses.lastIndexOf('done'));
@@ -172,7 +206,38 @@ export function App() {
     [openProject, setStepIndex],
   );
 
+  /**
+   * Restores the project that was open before a refresh. One shot per mount, so
+   * navigating back to the library afterwards sticks.
+   */
+  const restored = useRef(false);
+  React.useEffect(() => {
+    if (restored.current || !user || projectsLoading || projects.length === 0) return;
+    restored.current = true;
+    let saved: string | null = null;
+    try {
+      saved = sessionStorage.getItem(ACTIVE_KEY);
+    } catch {
+      return;
+    }
+    if (saved && projects.some((p) => p.id === saved)) void handleOpenProject(saved);
+  }, [user, projects, projectsLoading, handleOpenProject]);
+
+  const forgetActive = () => {
+    try {
+      sessionStorage.removeItem(ACTIVE_KEY);
+    } catch {
+      /* nothing to forget */
+    }
+  };
+
+  const goLibrary = () => {
+    forgetActive();
+    setScreen('projects');
+  };
+
   const goNew = () => {
+    forgetActive();
     setScreen('new');
     setNpTitle('');
     setNpText('');
@@ -211,7 +276,7 @@ export function App() {
           <Header
             screen={screen}
             user={user}
-            onNavigateLibrary={() => setScreen('projects')}
+            onNavigateLibrary={goLibrary}
             onNavigateNew={goNew}
             onLogout={handleLogoutClick}
           />
@@ -281,13 +346,13 @@ export function App() {
             <ResultView
               project={displayProject}
               onBackToPipeline={() => setScreen('pipeline')}
-              onReturnLibrary={() => setScreen('projects')}
+              onReturnLibrary={goLibrary}
             />
           )}
         </div>
       )}
 
-      <Toast message={toast} />
+      <Toast message={toast} isError={toastIsError} onDismiss={dismissToast} />
     </div>
   );
 }
