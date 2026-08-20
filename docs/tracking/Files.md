@@ -21,8 +21,6 @@ Complete map of all tracked source code, configuration, scripts, and documentati
 - [[TESTING.md]] — Frontend & Backend testing strategy + test output log (Graded deliverable)
 - [[README.md]] — Project overview, start/test instructions & architecture
 - [[package.json]] — Root workspace configuration & orchestration scripts
-- [[start.sh]] / [[start.bat]] — 1-command startup script
-- [[test.sh]] / [[test.bat]] — 1-command test suite runner
 - [[.env.example]] — Environment variables template
 - [[app-demo.html]] — Reference interactive prototype
 

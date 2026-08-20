@@ -17,8 +17,7 @@ Tracking active implementation milestones, verification status, and deliverable 
 
 ## Milestone 1: Harness & Scaffolding
 - [x] Monorepo npm workspaces configured (`client`, `server`)
-- [x] Single start script (`./start.sh` / `start.bat`)
-- [x] Single test runner script (`./test.sh` / `test.bat`)
+- [x] Single start command (`npm run dev`) and single test command (`npm test`)
 - [x] Obsidian vault configuration & ignore filters (`.obsidian/app.json`)
 - [x] Environment configuration (`.env.example`)
 

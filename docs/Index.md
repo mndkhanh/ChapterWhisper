@@ -53,6 +53,6 @@ Style (01) ──► Characters (02) ──► Portraits (03) ──► Chapters
 - **Frontend**: React (Vite + TypeScript + Tailwind CSS with Amrit Palace theme).
 - **Backend**: Node.js / Express.js (TypeScript).
 - **Storage**: Local JSON files on disk (`data/`) with mutex-guarded atomic writes.
-- **Harness**: Single start command (`npm run dev` / `start.bat` / `./start.sh`) and single test command (`npm test` / `test.bat` / `./test.sh`).
+- **Harness**: Single start command (`npm run dev`) and single test command (`npm test`), both from the repo root.
 - **Caps**: Max 2 characters, Max 1 chapter enforced server-side.
 - **Guards**: Server-side in-flight step lock prevents duplicate Gemini calls on refresh/double-click.
