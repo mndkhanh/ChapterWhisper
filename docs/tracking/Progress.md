@@ -38,7 +38,7 @@ Tracking active implementation milestones, verification status, and deliverable 
 - [ ] Stranded / stuck step timeout and recovery mechanism
 
 ## Milestone 4: Frontend UI / UX (Amrit Palace Design System)
-- [ ] Tailwind CSS configuration with Amrit Palace design tokens
+- [x] Tailwind CSS configuration with Amrit Palace design tokens
 - [ ] Studio authentication & user session handling
 - [ ] Project dashboard with step progress stepper and status badges
 - [ ] New project modal supporting `.txt` file upload and text pasting
@@ -49,7 +49,7 @@ Tracking active implementation milestones, verification status, and deliverable 
 - [ ] In-progress step indicator and error retry affordance
 
 ## Milestone 5: Testing & Deliverables
-- [x] Backend tests for identity and the concurrency-safe JSON store (13 passing)
+- [x] Backend tests for identity and the concurrency-safe JSON store (18 passing)
 - [ ] Backend tests for step ordering, state machine, caps, and retry safety
 - [ ] Frontend tests for component loading, empty, and error states
 - [x] Real test run captured and recorded in [[TESTING]]

@@ -8,11 +8,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 upload a book's text, then run a 5-step Gemini pipeline one step at a time —
 style → characters → portraits → chapters → illustrations.
 
-**Current state: identity and storage done, pipeline not started.** npm workspaces +
+**Current state: storage and identity done, pipeline not started.** npm workspaces +
 Express/TS server + Vite/React/TS client. The server has passwordless auth
-(`POST /api/auth/login`, `GET /api/auth/me`) over a JSON-file store with per-file mutex locks
-and atomic write-rename. No projects, no Gemini integration, and no UI beyond the health-check
-page. The design for the rest is specified in `docs/` — see below.
+(`POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/logout`) over a JSON-file store
+with per-file mutex locks and atomic write-rename; 18 server tests and 2 client tests pass.
+Tailwind is fully wired with the Amrit Palace tokens, but there is no UI beyond the
+health-check page — no projects, no Gemini integration. The design for the rest is specified
+in `docs/` — see below.
 
 ## Work through the vault, every task
 
@@ -55,8 +57,14 @@ Run from the repo root — the workspaces are driven from there.
 | `npm run dev:server` / `dev:client`   | One side only                                                                                                         |
 | `npm run test:server` / `test:client` | One side only                                                                                                         |
 
-Single test file or name: `npm test --workspace=server -- tests/health.test.ts`, or
-`-- -t "substring"`. Watch mode: drop the `run` — `npx vitest` inside `server/` or `client/`.
+Single test file or name: `npm test --workspace=server -- tests/auth.test.ts`, or
+`-- -t "races itself"`. Watch mode: drop the `run` — `npx vitest` inside `server/` or `client/`.
+Per-test detail for pasting into `TESTING.md`: `npx vitest run --reporter=verbose` inside the
+workspace.
+
+The suite needs no `.env` and no network — `server/tests/auth.test.ts` points `STORAGE_DIR` at
+a fresh temp dir and sets a throwaway `JWT_SECRET` before importing the app, then removes the
+directory afterwards. Nothing touches the real `data/`.
 
 `npm start` runs **only** the built server; nothing serves `client/dist` yet, so production is
 not a working path. The PRD requires one command to start the stack and one to run the tests —
@@ -81,70 +89,112 @@ docs in that format and register them in `docs/tracking/Files.md`.
 | `docs/tracking/Progress.md`               | Milestone checklist — 5 milestones, roughly the intended build order                                                                                                           |
 | `docs/tracking/Files.md`                  | File registry; update it when adding files                                                                                                                                     |
 | `app-demo.html`                           | Ships with the assessment. Standalone `localStorage` mock of the whole flow. Open it in a browser; it is the **scope and behavior floor** for the UI                           |
-| `README.md`, `TESTING.md`, `DECISIONS.md` | Graded deliverables, still empty / scaffold only — see below                                                                                                                   |
+| `README.md`, `TESTING.md`, `DECISIONS.md` | Graded deliverables at three different stages — see below                                                                                                                      |
 
-### Where the docs and the code disagree
+### Keeping the docs honest
 
-The docs describe the intended system; several claims are not true of the tree yet. Trust the
-filesystem, and fix the doc rather than working around it.
+The docs currently match the tree. An earlier round of drift — stale `docs/` paths in
+`Files.md`, "auto-recovering" wording for stale runs in `Architecture.md`, an unticked Tailwind
+box in `Progress.md` — has been fixed rather than worked around. Two rules keep it that way:
 
-- **`Files.md` has stale paths** from before the reorg — it lists `docs/PRD.md`,
-  `docs/Architecture.md`, `docs/Progress.md`, `docs/DESIGN.md`, `docs/Files.md`, all of which
-  now live under `docs/spec/`, `docs/architecture/`, `docs/tracking/`, `docs/design/`.
-- **Tailwind is further along than `Progress.md` says.** Milestone 4's first box is unchecked,
-  but `client/tailwind.config.js` already carries the full Amrit Palace palette and font
-  stacks — it is only the CSS wiring that is missing (see Traps).
-- **`Architecture.md` says stale runs are "auto-recovering" past 2 minutes.** Read that as
-  _clearing the stale lock so the user can press retry_. A timeout that clears `stepState` is
-  sanctioned by the PRD; a timeout that fires a fresh Gemini call on its own violates the
-  no-auto-retry rule. Keep the distinction explicit in the code.
+- **Trust the filesystem over the note, and fix the note in the same change.** Never code
+  around a stale doc.
+- **`Progress.md` and `Files.md` rot first**, because they carry counts and paths. `Progress.md`
+  names a passing-test count: re-run `npm test` and correct it rather than repeating it.
+
+Where the deliverables actually stand: `TESTING.md` is written and carries a real pasted run.
+`README.md` is **empty (0 bytes)**. `DECISIONS.md` is a five-line template stub.
 
 ## Architecture
 
 ```
-package.json          workspaces: [server, client]; all dev/test/build entry points
-server/  Express 4 + TS (ESM, NodeNext) — src/index.ts is the whole server today
-client/  Vite 6 + React 18 + TS + Tailwind 3
+package.json                    workspaces: [server, client]; all dev/test/build entry points
+
+server/   Express 4 + TS (ESM, NodeNext)
+  src/index.ts                  dotenv.config(), PORT, listen — nothing else
+  src/app.ts                    createApp(): cors → cookie-parser → json({limit:'5mb'})
+                                → /api/health → /api/auth
+  src/config.ts                 lazy env accessors: getDataDir/getJwtSecret/getJwtExpiresIn
+  src/storage/json-file.ts      withFileLock, readJson, writeJsonAtomic, updateJson
+  src/users/user-store.ts       User, normalizeEmail, findByEmail/findById/findOrCreate
+  src/auth/jwt.ts               signToken / verifyToken
+  src/auth/cookie.ts            SESSION_COOKIE ('cw_session'), flags, sessionMaxAgeMs()
+  src/auth/middleware.ts        requireAuth — cookie only, re-reads the user from the store
+  src/auth/routes.ts            login / me / logout
+  tests/                        supertest against createApp(): auth, json-file, health
+
+client/   Vite 6 + React 18 + TS + Tailwind 3
+  src/main.tsx, src/App.tsx     health-check page only, so far
+  src/index.css                 @tailwind directives + body base styles
+  src/test/                     jsdom + Testing Library
 ```
 
+- **There is no module-level `app`** — `createApp()` is a factory so tests can drive it with
+  supertest without binding a port. Mount new routers inside it; don't build a second app.
 - **The two sides talk over a Vite proxy, not CORS, in dev.** `client/vite.config.ts` proxies
-  `/api` → `BACKEND_URL` (default `http://localhost:4000`), so client code calls relative
-  `/api/...` paths and never hardcodes a host. Keep it that way. The server also enables
-  `cors()` broadly, which is what makes a direct `:4000` hit work.
+  `/api` → `BACKEND_URL` (default `http://localhost:4000`) for both `server` and `preview`, so
+  client code calls relative `/api/...` paths and never hardcodes a host. Keep it that way. The
+  server also enables `cors({ origin: true, credentials: true })`, which is what makes a direct
+  `:4000` hit work — `origin: true` reflects the caller because browsers refuse `*` alongside
+  credentials.
 - **Storage is JSON files on disk**, no database: `data/users.json`, `data/projects/*.json`,
   binaries under `data/storage/{projectId}/{portraits,illustrations}/`, rooted at
-  `STORAGE_DIR`. Writes must be mutex-guarded and atomic (write-temp + rename) — overlapping
-  writes are the failure mode this design has to defend against. All of `data/` is gitignored.
+  `STORAGE_DIR`. All of `data/` is gitignored.
+- **`updateJson(file, fallback, mutate)` is the only sanctioned way to mutate a file.** It runs
+  read-modify-write inside that file's lock — a per-path promise chain that survives a rejected
+  holder — and writes go to `<file>.<uuid>.tmp` then `rename` over the target, which is atomic
+  on both POSIX and NTFS. **Do the lookup inside the mutator, not before it**: `findOrCreate`
+  does exactly that, and it is what stops two simultaneous first-time logins from creating two
+  users. The lock is per-process — correct for one server, not for two processes sharing one
+  `data/`.
 - **Auth is passwordless**: email + name only. Known email loads that user's projects, unknown
-  email creates the user. No password, no OAuth (`PRD.md:118`).
+  email creates the user. No password, no OAuth (`PRD.md:118`). Email is normalized (trim +
+  lowercase) and is the identity key; an existing user's stored name is never overwritten by a
+  later sign-in.
 - **The session is an `httpOnly` cookie** (`cw_session`), not a bearer token. Three rules that
   follow from that choice and are each covered by a test — don't undo them casually:
   the token is **never** returned in the response body; `requireAuth` reads the cookie **only**
   and ignores `Authorization: Bearer`; and **logout must be a server call**
   (`POST /api/auth/logout`), because the client physically cannot clear an `httpOnly` cookie.
-  Cookie `Max-Age` is derived from `JWT_EXPIRES_IN` so browser and token expire together.
-  CSRF defence is `SameSite=Lax` alone — no CSRF token, deliberately (see `TESTING.md`).
+  Cookie `Max-Age` is derived from `JWT_EXPIRES_IN` so browser and token expire together, and
+  `secure` is set only when `NODE_ENV === 'production'` so dev over plain http keeps the cookie.
+  `requireAuth` re-reads the user from the store on every request, so a token that outlives its
+  user fails closed instead of authorizing a ghost. CSRF defence is `SameSite=Lax` alone — no
+  CSRF token, deliberately (see `TESTING.md`).
 - **Env lives in two places.** Root `.env` and `server/.env` are byte-identical copies of
   `.env.example`; `dotenv.config()` in `server/src/index.ts` resolves against the server's cwd,
   so `server/.env` is the one that actually loads under `npm run dev`. Keep them in sync or
   collapse to one — silently divergent copies are a debugging trap.
-- **Installed-but-unused deps encode the intended design**, not accidents: `jsonwebtoken`
-  (auth), `multer` (`.txt` upload), `zod` (validating Gemini's structured JSON and request
-  bodies), `uuid`.
+- **Installed-but-unused deps encode the intended design**, not accidents: `multer`
+  (`.txt` upload), `uuid`, and on the client `clsx`, `tailwind-merge`, `lucide-react`. `zod` is
+  already in use for request bodies and is also the intended validator for Gemini's structured
+  JSON.
 
 ### Traps in the current scaffold
 
 - **`server/tsconfig.json` includes only `src/`,** but tests live in `server/tests/`. They run
-  under vitest but are never type-checked by `npm run build`.
+  under vitest but are never type-checked by `npm run build`. The client is the opposite: its
+  tests live under `client/src/test/`, which `include: ["src"]` covers, so `npm run build` does
+  type-check them.
 - **The server has no vitest config**, so it runs in the default `node` environment — correct
   for supertest, but any future DOM-ish server test needs its own config. The client has
-  `client/vitest.config.ts` (jsdom + `src/test/setup.ts`).
+  `client/vitest.config.ts` (jsdom + globals + `src/test/setup.ts`).
 - **Imports inside `server/src` must carry the `.js` extension** (`'./app.js'`), because the
   server is ESM with `moduleResolution: NodeNext`. Extensionless imports pass under `tsx` in dev
   and then break `node dist/index.js` in production.
 - **Env accessors in `config.ts` read `process.env` lazily on every call**, so `dotenv.config()`
   at startup and per-test `STORAGE_DIR` overrides both work. Don't hoist them into module-level
   constants — tests set the env before importing the app.
+- **Server tests set `process.env`, then `await import('../src/app.js')` at top level.** Keep
+  that shape in new server tests: a static import buries the ordering and leaves the suite one
+  careless module-level `process.env` read away from breaking.
+- **Nine committed files start with a UTF-8 BOM** — `.env.example`, `client/index.html`,
+  `client/postcss.config.js`, `client/tailwind.config.js`, both `tsconfig.json`s,
+  `docs/Index.md`, `docs/spec/Pipeline.md`, `docs/tracking/Progress.md`. An exact-match edit
+  against the first line of one of those has to account for it, and a rewrite shouldn't strip
+  it silently.
+- **`server/data/users.json` exists locally and is gitignored.** Manual sign-ins during dev
+  write there; it is not a test fixture.
 
 ## Hard requirements that constrain implementation
 
@@ -164,7 +214,9 @@ Graded, from `docs/spec/PRD.md`. Do not quietly relax them.
   mechanism is a `409 Conflict` when `stepState === 'RUNNING'`.
 - **Retryable failures**: a failed step leaves the project usable and retries that step alone.
 - **No stuck-forever state**: a step stranded "in progress" (server died mid-call) needs a
-  user-reachable recovery path — no manual file surgery.
+  user-reachable recovery path — no manual file surgery. A timeout that *clears* `stepState` so
+  the user can press retry is sanctioned; a timeout that fires a fresh Gemini call on its own
+  violates the no-auto-retry rule. Keep the distinction explicit in the code.
 - Gemini key via env var, never committed; ship `.env.example`. Images and book text on the
   local filesystem, served through our own API — no S3/CDN.
 - Out of scope, do not build: Veo animation, Lyria music, TTS narration, audiobook.
@@ -204,10 +256,13 @@ Do not port its `localStorage` store or its numbers.
   places the AI was overridden** (wrong, unsafe, or overcomplicated) and must cover stack +
   storage choice, how pipeline progress is modeled, and how duplicate execution on refresh is
   stopped. Closes with a one-more-day answer. This is the user's writeup — draft only when
-  asked, never invent decisions that did not happen.
-- **`TESTING.md`** — strategy for both sides (backend: step ordering, progress, retry;
-  frontend: a couple of components' loading/error/empty states), what is deliberately not
-  tested, plus **a real test run's output** pasted or committed. Never fabricate a report.
+  asked, never invent decisions that did not happen. Currently a template stub.
+- **`TESTING.md`** — written, and the pattern it sets is the one to extend: a table per side
+  with an automated-coverage column *and* a "human check" column, an explicit
+  deliberately-not-tested list, and real pasted run output (colour codes stripped, nothing else
+  altered). When tests are added, re-run and re-paste — never fabricate or hand-edit a report.
+- **`README.md`** — still empty. Reviewer guide, prerequisites, the single start command, and
+  the single test command.
 - **Git history** — small, meaningful, incremental commits with real messages, committed as
   work happens. No single giant commit; reviewers look at timestamps. Note in the message body
   when a commit was mostly AI-authored — the PRD says honesty scores and hiding it doesn't.
@@ -217,8 +272,12 @@ Do not port its `localStorage` store or its numbers.
 - **Right-sized beats thorough.** Over-engineering is explicitly penalized. Prefer the smallest
   thing that fully works; JSON files on disk are an accepted storage choice at this scope if
   isolated per user/project and safe against overlapping writes.
-- **Harness first.** Improve the test/run loop as you go — the two `health.test.ts` sanity
-  tests are placeholders to be replaced by the first real tests, not accumulated around.
+- **Harness first.** Improve the test/run loop as you go. Both sides still carry a placeholder
+  `health.test.ts` asserting `true === true` — replace them with real tests rather than
+  accumulating around them.
+- **Write tests that can fail.** The lost-update test was verified by deleting `withFileLock`
+  from `updateJson` and watching it go red. A concurrency test that passes either way is
+  decoration.
 - Mock Gemini in tests — do not burn free-tier quota, which is tighter on the image model.
 - Keep `docs/tracking/Progress.md` and `docs/tracking/Files.md` current as work lands. They are
-  only useful if they can be trusted; see the drift list above for what happens otherwise.
+  only useful if they can be trusted.

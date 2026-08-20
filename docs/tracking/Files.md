@@ -61,5 +61,7 @@ Complete map of all tracked source code, configuration, scripts, and documentati
 - [[client/index.html]] — HTML page container
 - [[client/vite.config.ts]] — Vite bundler & API proxy configuration
 - [[client/vitest.config.ts]] — Vitest configuration with `jsdom`
+- [[client/tailwind.config.js]] — Tailwind theme: Amrit Palace palette & font stacks
+- [[client/postcss.config.js]] — PostCSS pipeline wiring Tailwind + Autoprefixer
 - [[client/package.json]] — Client dependencies & scripts
 - [[client/tsconfig.json]] — Client TypeScript configuration
