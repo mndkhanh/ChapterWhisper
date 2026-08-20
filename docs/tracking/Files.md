@@ -54,6 +54,7 @@ Complete map of all tracked source code, configuration, scripts, and documentati
 ## 🎨 Frontend Client (`client/`)
 - [[client/src/App.tsx]] — Main React application root component
 - [[client/src/main.tsx]] — React DOM client entry point
+- [[client/src/types.ts]] — TypeScript interfaces for User, Project, Characters, Chapters & StepStatus
 - [[client/src/index.css]] — Global stylesheet & design token classes
 - [[client/src/test/health.test.ts]] — Client sanity test
 - [[client/src/test/App.test.tsx]] — Client App component test

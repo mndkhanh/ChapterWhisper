@@ -1,5 +1,3 @@
-## {{title}}
+## Store the JWT in local storage or httponly cookie
 
-One paragraph, your own words. Who proposed it, who pushed back, where you
-landed, what it cost. Not a time log — the git history covers that.
-At least 3 of these must be places you overrode the AI (PRD §2.3).
+The claude suggests using local storage for the scope, but I pushed back becuase the insecurity problem. Afterwards, I chose httpOnly Cookie, which immunes to XSS since JS can't read it and fits in this scope.

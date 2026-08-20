@@ -1,19 +1,36 @@
-import { render, screen, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import App from '../App';
 
 describe('App component', () => {
-  it('renders heading and updates status from backend', async () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('renders login screen by default', () => {
+    render(<App />);
+    expect(screen.getByText('CHAPTERWHISPER')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /enter the atelier/i })).toBeInTheDocument();
+  });
+
+  it('allows logging in and viewing the library', async () => {
     global.fetch = vi.fn().mockImplementation(() =>
       Promise.resolve({
-        json: () => Promise.resolve({ status: 'ok', message: 'ChapterWhisper API is healthy' }),
+        ok: true,
+        json: () => Promise.resolve({ user: { id: 'u1', name: 'Evelyn Thorne', email: 'evelyn@atelier.co' } }),
       }) as unknown as Promise<Response>
     );
 
     render(<App />);
-    expect(screen.getByText('ChapterWhisper')).toBeInTheDocument();
-    await waitFor(() => {
-      expect(screen.getByText('ChapterWhisper API is healthy')).toBeInTheDocument();
-    });
+    const nameInput = screen.getByPlaceholderText('Evelyn Thorne');
+    const emailInput = screen.getByPlaceholderText('evelyn@atelier.co');
+    const loginButton = screen.getByRole('button', { name: /enter the atelier/i });
+
+    fireEvent.change(nameInput, { target: { value: 'Evelyn Thorne' } });
+    fireEvent.change(emailInput, { target: { value: 'evelyn@atelier.co' } });
+    fireEvent.click(loginButton);
+
+    expect(await screen.findByText('Your Library')).toBeInTheDocument();
   });
 });
+
