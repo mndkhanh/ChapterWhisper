@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import type { User, Project } from '../../types.js';
-import { SlidePresentationModal } from '../presentation/SlidePresentationModal.js';
+import React, { useState } from "react";
+import type { User, Project } from "../../types.js";
+import { SlidePresentationModal } from "../presentation/SlidePresentationModal.js";
 
 interface LibraryViewProps {
   user: User | null;
@@ -18,15 +18,12 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   onOpenProject,
   onNewProject,
 }) => {
-  const [presentingProject, setPresentingProject] = useState<Project | null>(null);
+  const [presentingProject, setPresentingProject] = useState<Project | null>(
+    null,
+  );
 
   return (
     <main className="max-w-6xl mx-auto px-8 py-16">
-      <div className="flex items-center gap-2 text-[11px] tracking-[0.25em] text-[#978e81] font-semibold uppercase mb-4">
-        <span className="w-1.5 h-1.5 rounded-full bg-[#d49653]" />
-        <span>STUDIO ARCHIVE · {user?.email}</span>
-      </div>
-
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-10 border-b border-[#b6ab9c]">
         <h1 className="font-serif font-light uppercase text-6xl md:text-8xl tracking-tight text-[#2c2c2c] m-0">
           Your Library
@@ -41,9 +38,15 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 
       {/* Loading — the shelf is fetched, so say so rather than showing a void. */}
       {loading && projects.length === 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-10" aria-hidden="true">
+        <div
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-10"
+          aria-hidden="true"
+        >
           {[0, 1, 2].map((i) => (
-            <div key={i} className="border border-[#b6ab9c] p-6 md:p-8 min-h-[300px] flex flex-col justify-between">
+            <div
+              key={i}
+              className="border border-[#b6ab9c] p-6 md:p-8 min-h-[300px] flex flex-col justify-between"
+            >
               <div>
                 <div className="skeleton h-4 w-20 mb-6 rounded-[2px]" />
                 <div className="skeleton h-8 w-4/5 mb-3 rounded-[2px]" />
@@ -55,7 +58,9 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         </div>
       )}
       {loading && projects.length === 0 && (
-        <p className="sr-only" role="status">Loading your library…</p>
+        <p className="sr-only" role="status">
+          Loading your library…
+        </p>
       )}
 
       {/* Empty — a first-time author would otherwise see a heading and nothing. */}
@@ -65,9 +70,10 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             The shelf is empty
           </div>
           <p className="text-sm text-[#615b53] max-w-md mx-auto leading-relaxed mb-8">
-            Paste a chapter or upload a <span className="font-mono text-xs">.txt</span> manuscript and
-            ChapterWhisper will carry it through five steps — style, cast, portraits, scene, and the
-            final composition plate.
+            Paste a chapter or upload a{" "}
+            <span className="font-mono text-xs">.txt</span> manuscript and
+            ChapterWhisper will carry it through five steps — style, cast,
+            portraits, scene, and the final composition plate.
           </p>
           <button
             onClick={onNewProject}
@@ -80,9 +86,11 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-10">
         {projects.map((p) => {
-          const doneCount = p.statuses.filter((x) => x === 'done').length;
+          const doneCount = p.statuses.filter((x) => x === "done").length;
           const pct = `${(doneCount / 5) * 100}%`;
-          const illustrationUrl = p.chapters[0]?.illustrationUrl || p.chapters.find((ch) => ch.illustrationUrl)?.illustrationUrl;
+          const illustrationUrl =
+            p.chapters[0]?.illustrationUrl ||
+            p.chapters.find((ch) => ch.illustrationUrl)?.illustrationUrl;
 
           return (
             <div
@@ -95,13 +103,17 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                   <span
                     className={`px-2 py-0.5 text-[10px] rounded-[2px] ${
                       doneCount === 5
-                        ? 'bg-[#d49653]/15 text-[#d49653]'
+                        ? "bg-[#d49653]/15 text-[#d49653]"
                         : doneCount > 0
-                        ? 'bg-[#2c2c2c]/10 text-[#2c2c2c]'
-                        : 'text-[#978e81]'
+                          ? "bg-[#2c2c2c]/10 text-[#2c2c2c]"
+                          : "text-[#978e81]"
                     }`}
                   >
-                    {doneCount === 5 ? 'COMPLETE' : doneCount > 0 ? `STEP 0${doneCount + 1}` : 'INITIAL'}
+                    {doneCount === 5
+                      ? "COMPLETE"
+                      : doneCount > 0
+                        ? `STEP 0${doneCount + 1}`
+                        : "INITIAL"}
                   </span>
 
                   <button
@@ -138,7 +150,8 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                   {p.title}
                 </h3>
                 <p className="text-xs text-[#615b53] font-light">
-                  {p.wordCount.toLocaleString()} words · {p.chapters.length} chapter · {p.characters.length} cast
+                  {p.wordCount.toLocaleString()} words · {p.chapters.length}{" "}
+                  chapter · {p.characters.length} cast
                 </p>
               </div>
 
