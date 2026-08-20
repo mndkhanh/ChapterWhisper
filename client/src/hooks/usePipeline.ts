@@ -90,12 +90,22 @@ export function usePipeline(
 
   const selectStep = useCallback((idx: number) => setStepIndex(idx), []);
 
+  /**
+   * Selects a preset, or clears it when the one already staged is picked again.
+   * Clearing is a real third choice rather than an undo: with no style staged,
+   * step 01 posts no `style` body and Gemini derives one from the manuscript.
+   */
   const updateStyle = useCallback(
     (style: string) => {
-      setPendingStyle(style);
-      onToast(`Art style set to ${style} · press Generate to apply it`);
+      const next = pendingStyle === style ? null : style;
+      setPendingStyle(next);
+      onToast(
+        next
+          ? `Art style set to ${next} · press Generate to apply it`
+          : 'Art style cleared · Gemini will derive one from the manuscript',
+      );
     },
-    [onToast],
+    [pendingStyle, onToast],
   );
 
   const applyCustomStyle = useCallback(() => {

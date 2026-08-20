@@ -9,9 +9,19 @@ const META = [
   { num: '05', eyebrow: 'STEP FIVE', title: 'Illustration', desc: 'Compose the final plate — style, cast, and scene resolved into one image.' },
 ];
 
+/**
+ * Fail-safe presets for step 01 (DECISIONS.md §2). Client-side only: the chosen
+ * name is posted as the `{ style }` body when the step runs, and skipping all of
+ * them lets Gemini derive a style from the manuscript instead.
+ *
+ * These five are the ones the login marquee has always advertised.
+ */
 const DEFAULT_STYLES = [
-  { id: 'ink', name: 'Ink & Wash', desc: 'Loose etched linework flooded with translucent grey wash — spare, literary, close to the page.' },
-  { id: 'oil', name: 'Golden-Age Oil', desc: 'Warm varnished oil in the Rackham tradition — deep shadow, amber highlight, painterly grain.' },
+  { id: 'ink', name: 'Ink & Wash', preview: '/styles/ink-wash.png', desc: 'Loose etched linework flooded with translucent grey wash — spare, literary, close to the page.' },
+  { id: 'oil', name: 'Golden-Age Oil', preview: '/styles/golden-age.png', desc: 'Warm varnished oil in the Rackham tradition — deep shadow, amber highlight, painterly grain.' },
+  { id: 'etching', name: 'Etching', preview: '/styles/etching.png', desc: 'Fine crosshatched intaglio lines bitten into copper — stark, exacting, monochrome, all texture and no colour.' },
+  { id: 'woodcut', name: 'Woodcut', preview: '/styles/woodcut.png', desc: 'Gouged blacks and splintered grain pulled under heavy ink — folkloric, blunt, high contrast.' },
+  { id: 'storybook', name: 'Storybook', preview: '/styles/storybook.png', desc: 'Soft gouache and coloured pencil, rounded forms and warm light — the register of a book read aloud.' },
 ];
 
 /** Roughly how long each step blocks for, so the wait has a shape. */
@@ -100,6 +110,14 @@ export const PipelineStudio: React.FC<PipelineStudioProps> = ({
   onPrevStep,
   onViewResult,
 }) => {
+  // Which action the primary slot in the step heading offers.
+  const canAdvance = project.statuses[stepIndex] === 'done' && stepIndex < 4;
+  const canViewResult = project.statuses[4] === 'done' && stepIndex === 4;
+
+  /** A staged style that matches no preset came from the description box. */
+  const isCustomStaged =
+    Boolean(pendingStyle) && !DEFAULT_STYLES.some((st) => st.name === pendingStyle);
+
   const statusMeta = (st: StepStatus) => {
     switch (st) {
       case 'done':
@@ -158,9 +176,57 @@ export const PipelineStudio: React.FC<PipelineStudioProps> = ({
 
       {/* Main Step Execution Area */}
       <div className="min-h-[500px]">
-        <div className="text-xs tracking-[0.2em] text-[#d49653] font-semibold uppercase mb-3">{META[stepIndex].eyebrow}</div>
-        <h1 className="font-serif font-light uppercase text-5xl md:text-6xl tracking-tight mb-3">{META[stepIndex].title}</h1>
-        <p className="max-w-xl text-sm leading-relaxed text-[#615b53] mb-8">{META[stepIndex].desc}</p>
+        <div className="flex items-start justify-between gap-8 flex-wrap">
+          <div className="flex-1 min-w-[260px]">
+            <div className="text-xs tracking-[0.2em] text-[#d49653] font-semibold uppercase mb-3">{META[stepIndex].eyebrow}</div>
+            <h1 className="font-serif font-light uppercase text-5xl md:text-6xl tracking-tight mb-3">{META[stepIndex].title}</h1>
+            <p className="max-w-xl text-sm leading-relaxed text-[#615b53] mb-8">{META[stepIndex].desc}</p>
+          </div>
+
+          {/* Every action for this step sits with its heading. A finished step
+              has nothing left to run, so the primary slot becomes the way
+              onward rather than a disabled "complete" badge — the rail already
+              reports DONE. */}
+          <div className="shrink-0 flex items-center gap-3 flex-wrap">
+            {stepIndex > 0 && (
+              <button
+                onClick={onPrevStep}
+                className="text-xs font-semibold tracking-wider uppercase text-[#978e81] hover:text-[#2c2c2c] px-4 py-4 transition-colors cursor-pointer"
+              >
+                ← Back
+              </button>
+            )}
+
+            {canAdvance ? (
+              <button
+                onClick={onNextStep}
+                className="bg-[#2c2c2c] hover:bg-[#292622] text-[#d8cbb8] rounded-[3px] px-8 py-4 text-xs font-semibold tracking-wider uppercase cursor-pointer transition-colors"
+              >
+                Next Step →
+              </button>
+            ) : canViewResult ? (
+              <button
+                onClick={onViewResult}
+                className="bg-[#d49653] hover:bg-[#c38542] text-[#292622] rounded-[3px] px-8 py-4 text-xs font-semibold tracking-wider uppercase cursor-pointer transition-colors"
+              >
+                View the Plate →
+              </button>
+            ) : (
+              <button
+                onClick={onRunStep}
+                disabled={project.statuses[stepIndex] === 'running'}
+                className="bg-[#2c2c2c] hover:bg-[#292622] text-[#d8cbb8] rounded-[3px] px-8 py-4 text-xs font-semibold tracking-wider uppercase cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {project.statuses[stepIndex] === 'running'
+                  ? 'Generating...'
+                  : project.statuses[stepIndex] === 'failed'
+                  ? 'Retry Step'
+                  : 'Generate Step'}
+              </button>
+            )}
+          </div>
+        </div>
+
         <div className="h-px bg-[#b6ab9c] mb-8" />
 
         {project.statuses[stepIndex] === 'running' && (
@@ -190,53 +256,110 @@ export const PipelineStudio: React.FC<PipelineStudioProps> = ({
               /* ── Selection UI (only when step is not done) ── */
               <>
                 <div className="border-l-2 border-[#d49653] bg-[#bfb4a3]/20 p-4 text-xs text-[#615b53] mb-8">
-                  Choose a preset style below, type a custom one, or <strong>skip both and press Generate</strong> — Gemini will analyse the manuscript and derive one for you.
+                  Describe the style you want, choose one of the presets below, or <strong>skip both and press Generate</strong> — Gemini will analyse the manuscript and derive one for you.
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8">
+                {/* Describing a style is the expressive path, so it leads. The
+                    presets below are the fail-safe. */}
+                <div className="border border-[#b6ab9c] p-6 bg-[#d8cbb8] mb-8">
+                  <label
+                    htmlFor="custom-style"
+                    className="block text-[11px] font-semibold uppercase tracking-[0.18em] mb-2.5 text-[#615b53]"
+                  >
+                    Describe Your Own Art Style
+                  </label>
+                  <div className="flex gap-3">
+                    <input
+                      id="custom-style"
+                      type="text"
+                      value={customStyle}
+                      onChange={(e) => onCustomStyleChange(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          onApplyCustomStyle();
+                        }
+                      }}
+                      placeholder="e.g. Victorian watercolor with deep umber shadows..."
+                      className="flex-1 bg-transparent border border-[#b6ab9c] rounded-[2px] px-4 py-2.5 text-sm outline-none focus:border-[#d49653] transition-colors"
+                    />
+                    <button
+                      onClick={onApplyCustomStyle}
+                      disabled={!customStyle.trim()}
+                      className="bg-[#2c2c2c] text-[#d8cbb8] text-[11px] uppercase px-6 py-2.5 font-semibold tracking-wider rounded-[2px] hover:bg-[#292622] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Apply
+                    </button>
+                  </div>
+                  {isCustomStaged && (
+                    <div className="mt-3 flex items-start gap-2 text-xs text-[#615b53]">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#d49653] shrink-0 mt-1.5" />
+                      <span>
+                        Staged: <span className="font-semibold text-[#2c2c2c]">{pendingStyle}</span> ·
+                        press Generate to apply it
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="flex-1 h-px bg-[#b6ab9c]" />
+                  <span className="text-[11px] tracking-[0.2em] text-[#978e81] font-semibold uppercase">
+                    Or Choose a Preset
+                  </span>
+                  <div className="flex-1 h-px bg-[#b6ab9c]" />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mb-8">
                   {DEFAULT_STYLES.map((st) => {
                     const selected = (pendingStyle ?? project.style) === st.name;
                     return (
                       <div
                         key={st.id}
                         onClick={() => onUpdateStyle(st.name)}
-                        className={`border p-6 cursor-pointer transition-all ${
+                        title={selected ? 'Click again to clear this style' : `Select ${st.name}`}
+                        className={`group border p-6 cursor-pointer transition-all ${
                           selected ? 'border-[#d49653] bg-[#d49653]/10 shadow-sm' : 'border-[#b6ab9c] hover:border-[#2c2c2c] bg-[#d8cbb8]'
                         }`}
                       >
-                        <div className="h-28 plate-canvas border border-[#b6ab9c] mb-4 flex items-center justify-center text-[11px] text-[#292622]/60 font-mono tracking-widest uppercase">
-                          {st.name}
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <h3 className="font-serif font-light text-2xl">{st.name}</h3>
-                          <span className={`text-[11px] font-semibold tracking-widest ${selected ? 'text-[#d49653]' : 'text-[#978e81]'}`}>
-                            {selected ? '✓ SELECTED' : 'SELECT'}
+                        <div className="relative aspect-[4/5] plate-canvas border border-[#b6ab9c] mb-4 overflow-hidden">
+                          {/* A style is judged by looking at it, so the sample
+                              plate carries the card rather than a label. */}
+                          <img
+                            src={st.preview}
+                            alt={`${st.name} sample plate`}
+                            loading="lazy"
+                            className={`w-full h-full object-cover object-top transition-all duration-500 ${
+                              selected ? '' : 'grayscale-[35%] group-hover:grayscale-0 group-hover:scale-[1.03]'
+                            }`}
+                          />
+                          <span
+                            // Solid, because it now sits over a photograph: a
+                            // translucent chip disappears into the dark plates.
+                            className={`absolute top-2 right-2 px-2 py-1 rounded-[2px] text-[10px] font-semibold tracking-widest shadow-sm ${
+                              selected
+                                ? 'bg-[#d49653] text-[#292622]'
+                                : 'bg-[#292622]/85 text-[#d8cbb8] group-hover:bg-[#d49653] group-hover:text-[#292622]'
+                            }`}
+                          >
+                            {selected ? (
+                              <>
+                                {/* Clearing is only discoverable if the card says so. */}
+                                <span className="group-hover:hidden">✓ SELECTED</span>
+                                <span className="hidden group-hover:inline">✕ CLEAR</span>
+                              </>
+                            ) : (
+                              'SELECT'
+                            )}
                           </span>
                         </div>
+                        <h3 className="font-serif font-light text-2xl">{st.name}</h3>
                         <p className="text-xs text-[#615b53] mt-2 leading-relaxed">{st.desc}</p>
                       </div>
                     );
                   })}
                 </div>
 
-                <div className="border border-[#b6ab9c] p-6 bg-[#d8cbb8]">
-                  <label className="block text-[11px] font-semibold uppercase tracking-[0.18em] mb-2.5 text-[#615b53]">Or Describe a Custom Art Style</label>
-                  <div className="flex gap-3">
-                    <input
-                      type="text"
-                      value={customStyle}
-                      onChange={(e) => onCustomStyleChange(e.target.value)}
-                      placeholder="e.g. Victorian watercolor with deep umber shadows..."
-                      className="flex-1 bg-transparent border border-[#b6ab9c] rounded-[2px] px-4 py-2.5 text-sm outline-none focus:border-[#d49653] transition-colors"
-                    />
-                    <button
-                      onClick={onApplyCustomStyle}
-                      className="bg-[#2c2c2c] text-[#d8cbb8] text-[11px] uppercase px-6 py-2.5 font-semibold tracking-wider rounded-[2px] hover:bg-[#292622] transition-colors cursor-pointer"
-                    >
-                      Apply
-                    </button>
-                  </div>
-                </div>
               </>
             )}
           </div>
@@ -443,51 +566,6 @@ export const PipelineStudio: React.FC<PipelineStudioProps> = ({
           </div>
         )}
 
-        {/* Actions & Feedback Footer */}
-        <div className="flex items-center gap-4 mt-10 flex-wrap">
-          <button
-            onClick={onRunStep}
-            disabled={
-              project.statuses[stepIndex] === 'running' || project.statuses[stepIndex] === 'done'
-            }
-            className="bg-[#2c2c2c] hover:bg-[#292622] text-[#d8cbb8] rounded-[3px] px-8 py-4 text-xs font-semibold tracking-wider uppercase cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {project.statuses[stepIndex] === 'running'
-              ? 'Generating...'
-              : project.statuses[stepIndex] === 'failed'
-              ? 'Retry Step'
-              : project.statuses[stepIndex] === 'done'
-              ? '✓ Step Complete'
-              : 'Generate Step'}
-          </button>
-
-          {project.statuses[stepIndex] === 'done' && stepIndex < 4 && (
-            <button
-              onClick={onNextStep}
-              className="bg-[#2c2c2c] text-[#d8cbb8] rounded-[3px] px-8 py-4 text-xs font-semibold tracking-wider uppercase cursor-pointer"
-            >
-              Next Step →
-            </button>
-          )}
-
-          {project.statuses[4] === 'done' && stepIndex === 4 && (
-            <button
-              onClick={onViewResult}
-              className="bg-[#d49653] text-[#292622] rounded-[3px] px-8 py-4 text-xs font-semibold tracking-wider uppercase cursor-pointer"
-            >
-              View the Plate →
-            </button>
-          )}
-
-          {stepIndex > 0 && (
-            <button
-              onClick={onPrevStep}
-              className="text-xs font-semibold tracking-wider uppercase text-[#978e81] hover:text-[#2c2c2c] px-4 py-4"
-            >
-              ← Back
-            </button>
-          )}
-        </div>
       </div>
     </main>
   );
