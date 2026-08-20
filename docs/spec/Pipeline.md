@@ -165,7 +165,26 @@ Each produced should be a simple image, no panels.
 - **Prompt Format**:
   - Input parts: Reference character portrait images + Prompt:
     `"Create an illustration for {chapter.name} using the previously generated characters following this description: {chapter.prompt}"`
-- **Chaining**: `previous_interaction_id: project.interactions.chaptersId`
+- **Chaining**: `previous_interaction_id: project.interactions.portraitsId`, falling back to
+  `chaptersId` only if step 03 left no interaction.
 - **Output**: PNG image saved locally to `data/storage/{projectId}/illustrations/{chapterId}.png`.
 - **State Transition**: Step 5 (`ready` → `running` → `done`). Overall project complete.
+
+> [!important] The plate must be conditioned on the portraits, not just described
+> Step 04 branches back to the text-only `charactersId` so text turns stay chained on text
+> turns ([[DECISIONS]] §7). That means `chaptersId` has **no portrait anywhere in its
+> ancestry** — a step 05 chained on it has never seen the cast and re-invents it from prose,
+> which is exactly how the plate ends up with the wrong number of people and the wrong faces.
+> Two things prevent it, and both are needed:
+>
+> 1. **Chain on `portraitsId`.** Image turns chained on image turns, the same principle §7
+>    applies to text. Nothing is lost by skipping the `chaptersId` turn, because the scene
+>    prompt is passed in the request body as text anyway.
+> 2. **Attach the portrait PNGs as `ImagePart` inputs.** `InputPart[]` has always been in
+>    `gemini/client.ts` for this; until now the runner sent a bare string and the type was dead
+>    code.
+>
+> The cast is scoped to the names step 04 reported in `chapter.characters`, and the prompt states
+> the figure **count** explicitly and forbids extra bystanders — without a count, "illustrate
+> this scene" invites a crowd.
 

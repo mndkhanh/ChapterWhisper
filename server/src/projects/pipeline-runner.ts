@@ -14,6 +14,7 @@ import {
   jsonSchemaFormat,
   parseJsonOutput,
 } from "../gemini/client.js";
+import type { InputPart } from "../gemini/client.js";
 import { mutateProject } from "./project-store.js";
 import type { Project, StepAttempt } from "./types.js";
 
@@ -253,18 +254,27 @@ async function runStep3Portraits(project: Project): Promise<Project> {
 }
 
 async function runStep4Chapters(project: Project): Promise<Project> {
+  // The model picks the cast, but it must hand back *our* ids rather than
+  // display names: matching prose names back to c1/c2 downstream is guesswork,
+  // and a miss silently widens the cast again. `enum` makes the id the only
+  // thing structured output will accept.
+  const castIds = project.characters.map((c) => c.id);
   const schema = jsonSchemaFormat({
     type: "object",
     properties: {
       name: { type: "string" },
       prompt: { type: "string" },
       characters: { type: "array", items: { type: "string" } },
+      characterIds: {
+        type: "array",
+        items: { type: "string", enum: castIds },
+      },
     },
-    required: ["name", "prompt"],
+    required: ["name", "prompt", "characterIds"],
   });
 
   const charDetails = project.characters
-    .map((c) => `Character "${c.name}": ${c.prompt}`)
+    .map((c) => `Character id "${c.id}" — "${c.name}": ${c.prompt}`)
     .join("\n");
 
   const promptInput = `Pick the single most illustratable scene in the book and provide one detailed prompt to illustrate it. It should be a single standalone image plate, not a multi-tiled page.
@@ -272,7 +282,7 @@ async function runStep4Chapters(project: Project): Promise<Project> {
 The main characters in this story and their exact established visual designs are:
 ${charDetails}
 
-Write a descriptive scene prompt for this chapter. If any of the characters above appear in the scene, explicitly refer to them by name and weave their exact visual features (attire, physical traits, colors) into the scene prompt so the image generator maintains strict visual consistency. Also list the names of all characters who appear in the scene.`;
+Write a descriptive scene prompt for this chapter. If any of the characters above appear in the scene, explicitly refer to them by name and weave their exact visual features (attire, physical traits, colors) into the scene prompt so the image generator maintains strict visual consistency. In "characters" list their display names, and in "characterIds" list the matching character ids exactly as given above — only those who genuinely appear in this scene.`;
 
   const interaction = await createInteraction({
     model: getTextModel(),
@@ -284,14 +294,28 @@ Write a descriptive scene prompt for this chapter. If any of the characters abov
     response_format: schema,
   });
 
-  type ChapterOut = { name: string; prompt: string; characters?: string[] };
+  type ChapterOut = {
+    name: string;
+    prompt: string;
+    characters?: string[];
+    characterIds?: string[];
+  };
   const parsed = parseJsonOutput(interaction) as ChapterOut | ChapterOut[];
   const ch = Array.isArray(parsed) ? parsed[0] : parsed;
   if (!ch?.prompt) throw new Error("Gemini did not return a chapter scene");
 
   return await mutateProject(project.id, (p) => {
     p.chapters = [
-      { id: "ch1", name: ch.name, prompt: ch.prompt, characters: ch.characters || [] },
+      {
+        id: "ch1",
+        name: ch.name,
+        prompt: ch.prompt,
+        characters: ch.characters || [],
+        // Keep only ids we actually issued — a model can still hallucinate one.
+        characterIds: (ch.characterIds || []).filter((id) =>
+          castIds.includes(id),
+        ),
+      },
     ];
     p.chapterIndex = 0;
     p.interactions.chaptersId = interaction.id;
@@ -300,6 +324,42 @@ Write a descriptive scene prompt for this chapter. If any of the characters abov
     if (p.statuses[4] === "locked") p.statuses[4] = "ready";
     return p;
   });
+}
+
+/**
+ * The cast step 04 said actually appears in the scene, resolved in three tiers.
+ *
+ * 1. `characterIds` — the authoritative link. Step 04 is asked for our own ids
+ *    under an `enum`, so structured output cannot return anything else.
+ * 2. Display names — the fallback for chapters recorded before step 04 returned
+ *    ids. Case-insensitive and tolerant of "Old Toad" for a stored "Toad".
+ * 3. The whole cast — last resort, so a scene is never illustrated with an
+ *    empty stage. This tier is the one that produced the wrong headcount, which
+ *    is why the tiers above it exist.
+ */
+function sceneCast(project: Project): Project["characters"] {
+  const chapter = project.chapters[0];
+
+  const ids = (chapter?.characterIds ?? []).filter(Boolean);
+  if (ids.length > 0) {
+    const byId = project.characters.filter((c) => ids.includes(c.id));
+    if (byId.length > 0) return byId;
+  }
+
+  const named = (chapter?.characters ?? [])
+    .map((n) => n.toLowerCase().trim())
+    .filter(Boolean);
+  if (named.length > 0) {
+    const byName = project.characters.filter((c) => {
+      const name = c.name.toLowerCase().trim();
+      return named.some(
+        (n) => n === name || n.includes(name) || name.includes(n),
+      );
+    });
+    if (byName.length > 0) return byName;
+  }
+
+  return project.characters;
 }
 
 async function runStep5Illustration(project: Project): Promise<Project> {
@@ -314,7 +374,8 @@ async function runStep5Illustration(project: Project): Promise<Project> {
   );
   await fs.mkdir(storageDir, { recursive: true });
 
-  const charDescriptions = project.characters
+  const cast = sceneCast(project);
+  const charDescriptions = cast
     .map((c) => `- Character "${c.name}": ${c.prompt}`)
     .join("\n");
 
@@ -326,15 +387,48 @@ ${project.style || "Consistent Fine Art Illustration Style"}
 Scene Composition & Narrative Action:
 ${ch.prompt}
 
-Character Visual Consistency Guidelines:
+Cast — exactly ${cast.length} ${cast.length === 1 ? "figure appears" : "figures appear"} in this illustration, and no one else:
 ${charDescriptions}
 
-Ensure all characters appearing in the scene strictly match their established visual descriptions, physical appearances, hair, clothing styles, and color palettes specified above. No text, no captions, no split panels.`;
+The reference portraits above show precisely how these characters look. Reproduce each one's face, hair, build and clothing exactly as rendered there. Do not add any other people, background figures, bystanders or crowds, and do not omit any of the named characters. Every figure is an adult; no children. No text, no captions, no split panels.`;
+
+  // The portraits are attached as image parts *and* the call is chained onto the
+  // portrait interaction, because neither alone was enough. Step 04 branches
+  // back to the text-only `charactersId` (DECISIONS.md §7), so a call chained on
+  // `chaptersId` has no portrait anywhere in its ancestry — the model was
+  // inventing the cast from the written description every time.
+  const inputParts: InputPart[] = [];
+  for (const c of cast) {
+    const portraitPath = path.join(
+      getDataDir(),
+      "storage",
+      project.id,
+      "portraits",
+      `${c.id}.png`,
+    );
+    try {
+      const data = await fs.readFile(portraitPath);
+      inputParts.push({
+        type: "text",
+        text: `Reference portrait of "${c.name}":`,
+      });
+      inputParts.push({
+        type: "image",
+        data: data.toString("base64"),
+        mime_type: "image/png",
+      });
+    } catch {
+      // A missing portrait file is not worth failing a paid image call over —
+      // the written description still carries the character.
+    }
+  }
+  inputParts.push({ type: "text", text: promptText });
 
   const interaction = await createInteraction({
     model: getImageModel(),
-    input: promptText,
-    previous_interaction_id: project.interactions.chaptersId,
+    input: inputParts,
+    previous_interaction_id:
+      project.interactions.portraitsId || project.interactions.chaptersId,
     system_instruction: SYSTEM_INSTRUCTIONS,
   });
 

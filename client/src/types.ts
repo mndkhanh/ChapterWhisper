@@ -20,6 +20,7 @@ export interface ChapterItem {
   name: string;
   prompt: string;
   characters: string[];
+  characterIds?: string[];
   illustrationUrl?: string;
 }
 

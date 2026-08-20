@@ -12,7 +12,10 @@ export interface Chapter {
   id: string;
   name: string;
   prompt: string;
+  /** Display names the model reported for the cast of this scene. */
   characters?: string[];
+  /** The same cast as our own character ids — the authoritative link. */
+  characterIds?: string[];
   illustrationUrl?: string;
 }
 
